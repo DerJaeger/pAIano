@@ -2,8 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 /**
  * Web MIDI needs hardware and a permission prompt, so we install a stub before
- * the page loads and play it from the test. This exercises the real adapter,
- * the real audio clock and the real UI — only the keyboard is fake.
+ * the page loads and play it from the test. This exercises the real adapter and
+ * the real UI — only the keyboard is fake.
  */
 async function stubMidiKeyboard(page: Page): Promise<void> {
   await page.addInitScript(() => {

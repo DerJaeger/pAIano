@@ -78,12 +78,12 @@ Each port gets a fake (`FakeMidiInput`, `FakeClock`, `RecordingAudioSink`) so th
 can be driven deterministically in unit tests — no audio hardware, no keyboard, no timers.
 
 ### Timing model
-- **Master clock is `AudioContext.currentTime`**, not `setTimeout`/rAF. Notes are scheduled ahead
-  with a lookahead window (~100ms) refreshed by a 25ms ticker (the classic "Tale of Two Clocks"
-  pattern). rAF only drives *visual* interpolation.
-- Web MIDI input events arrive with `event.timeStamp` in the `performance.now()` domain. We map
-  that to audio time once via `AudioContext.getOutputTimestamp()` + `baseLatency`, so input
-  timing accuracy doesn't depend on when React happens to render.
+- **Master clock is `performance.now()`** — _revised in Phase 4, [ADR-0004](docs/adr/0004-transport.md);
+  originally `AudioContext.currentTime`._ Notes are scheduled ahead with a lookahead window
+  (~150ms) refreshed by a 25ms ticker, and handed to the browser's MIDI stack with an absolute
+  timestamp, which does the precise delivery. rAF only drives *visual* interpolation.
+- Web MIDI input events arrive with `event.timeStamp` already in that domain, and
+  `MIDIOutput.send(data, timestamp)` schedules in it, so there is no conversion anywhere.
 - `Transport` in core is clock-agnostic: it takes a `now(): seconds` function. Tests inject a
   fake clock and step it manually.
 
@@ -113,7 +113,7 @@ not a guess.
 |---|---|---|
 | Build/stack | **Vite + React + TypeScript (strict)** | Fast HMR, best ecosystem fit for OSMD/pdf.js. |
 | Notation | **OpenSheetMusicDisplay** (MusicXML → VexFlow → SVG) | Has a cursor API, per-note SVG handles, actively used for exactly this. |
-| Guide audio | **soundfont via Web Audio** (`smplr` or `soundfont-player`) | Self-contained, offline, no hardware needed. Sits behind `AudioSinkPort` so MIDI-out can be added later without touching core. |
+| Guide audio | **MIDI out to your own instrument** — _revised in Phase 4, [ADR-0004](docs/adr/0004-transport.md)_ | Better sounds than anything we could ship, and genuinely offline: a soundfont library would fetch multi-MB samples from a CDN. Sits behind `MidiOutputPort`, so a browser-side synth stays an additive change for anyone without an instrument that accepts input. |
 | MIDI device | **Web MIDI API** directly (thin adapter, no `webmidi.js` dep) | The API is small; a wrapper adds surface area we'd have to fake anyway. |
 | SMF parsing | `@tonejs/midi` **or** hand-rolled | Decide in Phase 1 spike; hand-rolled is ~300 LOC and perfectly testable. |
 | `.mscz` ingest | **webmscore** (libmscore in WASM) — *optional, Phase 6* | Reads `.mscz` natively and emits MusicXML/MIDI/SVG client-side. Caveat: based on MuseScore 3, lightly maintained, multi-MB WASM. Kept behind a lazy-loaded adapter so it can be dropped. |
@@ -160,14 +160,25 @@ demonstrable.
   untouched by OSMD types.
 - **Done when:** a MuseScore export renders and a cursor can be driven to any bar.
 
-### Phase 4 — Transport & guide playback
+### Phase 4 — Transport & guide playback ✅
 - `Transport`: play/pause/stop/seek, tempo scaling, bar-range loop, count-in.
-- Lookahead scheduler → `AudioSinkPort` → soundfont adapter.
-- Per-part mute/solo (mute the hand you're practising).
+- Lookahead scheduler → `MidiOutputPort` → Web MIDI output adapter.
+- Per-staff mute/solo (mute the hand you're practising).
 - Cursor follows playback smoothly.
-- **Tests:** transport driven by `FakeClock` against a `RecordingAudioSink`, asserting exact
+- **Tests:** transport driven by `FakeClock` against a `RecordingMidiOutput`, asserting exact
   scheduled (time, note) pairs. Fully deterministic.
 - **Done when:** press play, hear the piece, watch the cursor track it.
+
+Two decisions landed here and are recorded in [ADR-0004](docs/adr/0004-transport.md): the guide
+plays out to your instrument rather than to a soundfont, and — with Web Audio out of the signal
+path — `performance.now()` milliseconds replace the audio clock as the app's single time domain,
+which is the domain both MIDI input and MIDI output scheduling already use.
+
+A usability pass afterwards changed how the sheet is read: the view shows a **rolling window of
+three systems** with the line being played at the top — rather than the whole piece, which scrolled
+out from under you whenever you reached for pause — and the cursor became **our own playhead**,
+interpolated between notes from the clock instead of stepping voice entry to voice entry. The
+geometry arithmetic lives in `core/notation/layout.ts`; the OSMD adapter only reports pixel boxes.
 
 ### Phase 5 — Practice engine *(the heart)*
 - `Matcher`: for the expected notes at position *t*, classify incoming input as correct / wrong /

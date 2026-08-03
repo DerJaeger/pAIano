@@ -1,41 +1,37 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { openWebMidi, type WebMidiPorts } from '../adapters/midi/webMidiAdapter';
 import { applyMidiEvent, silentKeyboard, type KeyboardState } from '../core/midi/keyboard';
+import type { MidiOutputPort } from '../core/midi/output';
 import type { MidiDevice, MidiInputPort } from '../core/midi/types';
-import { createAudioClock } from '../adapters/audio/audioClock';
-import { openWebMidi } from '../adapters/midi/webMidiAdapter';
 
 export type MidiStatus = 'idle' | 'connecting' | 'ready' | 'error';
 
-export type OpenMidi = () => Promise<MidiInputPort>;
-
-/** Web MIDI for real, plus the audio clock its timestamps are mapped onto. */
-export const openWebMidiInput: OpenMidi = () => {
-  const clock = createAudioClock();
-  return openWebMidi(() => clock.sample());
-};
+/** The seam tests replace: one call yielding both directions of one device. */
+export type OpenMidi = () => Promise<WebMidiPorts>;
 
 export interface MidiConnection {
   status: MidiStatus;
   error: string | undefined;
-  port: MidiInputPort | undefined;
+  input: MidiInputPort | undefined;
+  output: MidiOutputPort | undefined;
   connect: () => void;
 }
 
 /**
- * Opening MIDI is deliberately a user action: browsers prompt for permission,
- * and an `AudioContext` created outside a gesture starts suspended.
+ * Opening MIDI is deliberately a user action: browsers prompt for permission
+ * the first time, and doing it on load would be a prompt nobody asked for.
  */
-export function useMidiInput(open: OpenMidi = openWebMidiInput): MidiConnection {
+export function useMidi(open: OpenMidi = openWebMidi): MidiConnection {
   const [status, setStatus] = useState<MidiStatus>('idle');
   const [error, setError] = useState<string | undefined>(undefined);
-  const [port, setPort] = useState<MidiInputPort | undefined>(undefined);
+  const [ports, setPorts] = useState<WebMidiPorts | undefined>(undefined);
 
   const connect = useCallback(() => {
     setStatus('connecting');
     setError(undefined);
     open().then(
       (opened) => {
-        setPort(opened);
+        setPorts(opened);
         setStatus('ready');
       },
       (cause: unknown) => {
@@ -45,14 +41,15 @@ export function useMidiInput(open: OpenMidi = openWebMidiInput): MidiConnection 
     );
   }, [open]);
 
-  useEffect(() => () => port?.close(), [port]);
+  useEffect(() => () => ports?.close(), [ports]);
 
-  return { status, error, port, connect };
+  return { status, error, input: ports?.input, output: ports?.output, connect };
 }
 
 const NO_DEVICES: readonly MidiDevice[] = [];
 
-export function useMidiDevices(port: MidiInputPort | undefined): {
+/** Works for either direction — both ports report devices the same way. */
+export function useMidiDevices(port: MidiInputPort | MidiOutputPort | undefined): {
   devices: readonly MidiDevice[];
   selectedId: string | undefined;
 } {

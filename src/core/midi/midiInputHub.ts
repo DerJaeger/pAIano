@@ -1,5 +1,5 @@
-import { AudioTimeline, type AudioTimelineOptions } from './audioTimeline';
 import { decodeMidiMessage } from './decode';
+import { performanceClock, type Clock } from '../transport/clock';
 import type { MidiDevice, MidiInputEvent, MidiInputPort, Unsubscribe } from './types';
 
 /**
@@ -10,14 +10,14 @@ import type { MidiDevice, MidiInputEvent, MidiInputPort, Unsubscribe } from './t
  * timestamps — are written and tested once, in the pure core.
  */
 export class MidiInputHub implements MidiInputPort {
-  private readonly timeline: AudioTimeline;
+  private readonly clock: Clock;
   private readonly messageListeners = new Set<(event: MidiInputEvent) => void>();
   private readonly deviceListeners = new Set<() => void>();
   private devices: readonly MidiDevice[] = [];
   private selectedDeviceId: string | undefined;
 
-  constructor(options: AudioTimelineOptions = {}) {
-    this.timeline = new AudioTimeline(options);
+  constructor(clock: Clock = performanceClock) {
+    this.clock = clock;
   }
 
   getDevices(): readonly MidiDevice[] {
@@ -63,15 +63,18 @@ export class MidiInputHub implements MidiInputPort {
     this.notifyDevicesChanged();
   }
 
-  /** Correlates a `performance.now()` reading with an audio-clock reading. */
-  syncClock(performanceMs: number, audioTime: number): void {
-    this.timeline.sync(performanceMs, audioTime);
-  }
-
-  /** Raw bytes straight off a device, with the browser's timestamp in ms. */
+  /**
+   * Raw bytes straight off a device, with the browser's timestamp in ms.
+   *
+   * That timestamp is already in the app's master clock domain (ADR-0004), so
+   * there is nothing to convert. Some drivers send 0 for every message, which
+   * means "just now" rather than "at the time origin".
+   */
   handleRawMessage(deviceId: string, data: ArrayLike<number>, performanceMs?: number): void {
     if (deviceId !== this.selectedDeviceId) return;
-    const event = decodeMidiMessage(data, this.timeline.toAudioTime(performanceMs));
+    const time =
+      performanceMs === undefined || performanceMs <= 0 ? this.clock.now() : performanceMs;
+    const event = decodeMidiMessage(data, time);
     if (event) this.deliver(event);
   }
 

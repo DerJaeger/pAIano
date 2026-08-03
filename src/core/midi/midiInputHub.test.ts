@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MidiInputHub } from './midiInputHub';
+import { FakeClock } from '../transport/clock';
 import { FakeMidiInput } from './fakeMidiInput';
 import type { MidiInputEvent } from './types';
 
@@ -65,22 +66,36 @@ describe('MidiInputHub', () => {
     const events: MidiInputEvent[] = [];
     hub.onMessage((event) => events.push(event));
 
-    hub.syncClock(1000, 10);
     hub.handleRawMessage('b', [0x90, 60, 100], 1000);
     hub.handleRawMessage('a', [0x90, 60, 100], 1000);
 
-    expect(events).toEqual([{ type: 'noteOn', midiNote: 60, velocity: 100, channel: 0, time: 10 }]);
+    expect(events).toEqual([
+      { type: 'noteOn', midiNote: 60, velocity: 100, channel: 0, time: 1000 },
+    ]);
   });
 
-  it('timestamps events on the audio clock', () => {
-    const hub = new MidiInputHub();
+  it("keeps the driver's own timestamp, which is already the master clock", () => {
+    const hub = new MidiInputHub(new FakeClock(50));
     hub.setDevices([device('a')]);
     const events: MidiInputEvent[] = [];
     hub.onMessage((event) => events.push(event));
 
-    hub.syncClock(1000, 10);
     hub.handleRawMessage('a', [0x90, 60, 100], 1200);
-    expect(events[0]?.time).toBeCloseTo(10.2);
+
+    expect(events[0]?.time).toBe(1200);
+  });
+
+  it('reads the clock when the driver sends no timestamp', () => {
+    // Several drivers send 0 for every message; that means "just now".
+    const hub = new MidiInputHub(new FakeClock(1234));
+    hub.setDevices([device('a')]);
+    const events: MidiInputEvent[] = [];
+    hub.onMessage((event) => events.push(event));
+
+    hub.handleRawMessage('a', [0x90, 60, 100], 0);
+    hub.handleRawMessage('a', [0x90, 62, 100]);
+
+    expect(events.map((event) => event.time)).toEqual([1234, 1234]);
   });
 
   it('stops delivering after unsubscribe and after close', () => {

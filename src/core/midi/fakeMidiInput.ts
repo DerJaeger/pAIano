@@ -14,7 +14,7 @@ const DEFAULT_DEVICE: MidiDevice = {
  * assertions deterministic.
  */
 export class FakeMidiInput extends MidiInputHub {
-  /** Current audio-clock time, in seconds. */
+  /** Current master-clock time, in milliseconds (ADR-0004). */
   now = 0;
   /** What the fake player is holding down, for convenient assertions. */
   keyboard: KeyboardState = silentKeyboard;
@@ -27,8 +27,8 @@ export class FakeMidiInput extends MidiInputHub {
     this.setDevices(devices);
   }
 
-  advance(seconds: number): void {
-    this.now += seconds;
+  advance(ms: number): void {
+    this.now += ms;
   }
 
   press(midiNote: number, velocity = 64): void {

@@ -11,7 +11,10 @@ export interface MidiDevice {
 }
 
 interface MidiEventBase {
-  /** Audio-clock seconds, comparable with `AudioContext.currentTime`. */
+  /**
+   * Milliseconds in the `performance.now()` domain — the app's master clock
+   * (ADR-0004), and the same domain output messages are scheduled in.
+   */
   time: number;
   /** 0-based MIDI channel. */
   channel: number;

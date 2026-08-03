@@ -15,14 +15,20 @@ See [PLAN.md](PLAN.md) for the full product plan and delivery phases.
 | 0 — Foundations                | ✅ Vite + React + TS strict, Vitest, ESLint/Prettier, CI, Pages |
 | 1 — Score core                 | ✅ MusicXML/`.mxl` → timed note stream                          |
 | 2 — MIDI input                 | ✅ device picker, live keys-down, sustain pedal                 |
-| 3 — Notation view (OSMD)       | ⬜ next                                                         |
-| 4 — Transport & guide playback | ⬜                                                              |
-| 5 — Practice engine            | ⬜                                                              |
+| 3 — Notation view (OSMD)       | ✅ engraved score, cursor to any bar, per-note colouring        |
+| 4 — Transport & guide playback | ✅ play/pause/seek, tempo, bar loop, count-in, per-hand mute    |
+| 5 — Practice engine            | ⬜ next                                                         |
 | 6 — Library                    | ⬜                                                              |
 
 Today the app connects to a MIDI keyboard and lights up the keys you play (sustain pedal included),
-and opens a MusicXML or `.mxl` file to show what the parser understood: parts, measures,
-repeat-expanded duration, tempo map and the note stream. The two halves meet in Phase 5.
+and opens a MusicXML or `.mxl` file: it engraves the score, and plays it back **through your own
+instrument over MIDI out** — at any speed, looping the bar you are stuck on, with the hand you are
+practising muted — while the cursor tracks the music. Underneath it still shows what the parser
+understood: parts, measures, repeat-expanded duration, tempo map and the note stream.
+
+The guide needs an instrument that accepts incoming MIDI, and most keyboards want their
+&ldquo;local control off&rdquo; setting so the guide does not fight your own playing. Your playing
+and the score meet in Phase 5.
 
 ## Develop
 
@@ -50,10 +56,12 @@ src/
     xml/         ordered XML reader (MusicXML is order-sensitive)
     score/       Score model, tempo map, .mxl container
       musicxml/  parser, repeat expansion, fixture corpus
-    midi/        message decoding, keyboard state, input port + fake
+    midi/        message decoding, keyboard state, input + output ports + fakes
+    notation/    notation port + fake, written ↔ expanded positions
+    transport/   clock, tick ↔ time timeline, lookahead scheduler
   adapters/
-    midi/        Web MIDI  → MidiInputPort
-    audio/       AudioContext clock, for timestamping input
+    midi/        Web MIDI → MidiInputPort / MidiOutputPort
+    notation/    OpenSheetMusicDisplay → NotationPort
   ui/            React shell
 tests/           Playwright journeys
 ```

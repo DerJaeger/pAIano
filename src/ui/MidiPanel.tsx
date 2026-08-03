@@ -1,14 +1,14 @@
 import { noteName } from './format';
 import { PianoKeys } from './PianoKeys';
-import { openWebMidiInput, useKeyboardState, useMidiDevices, useMidiInput } from './useMidiInput';
-import type { OpenMidi } from './useMidiInput';
+import { useKeyboardState, useMidiDevices, type MidiConnection } from './useMidi';
 
 /**
- * Phase 2: pick a keyboard and see your playing land on screen. The practice
- * feedback (Phase 5) reads the same port.
+ * Phase 2: pick a keyboard and see your playing land on screen. The connection
+ * is owned by `App`, because Phase 4's guide track plays out of the same
+ * device; the practice feedback (Phase 5) will read the same port again.
  */
-export function MidiPanel({ open = openWebMidiInput }: { open?: OpenMidi }) {
-  const { status, error, port, connect } = useMidiInput(open);
+export function MidiPanel({ connection }: { connection: MidiConnection }) {
+  const { status, error, input: port, connect } = connection;
   const { devices, selectedId } = useMidiDevices(port);
   const keyboard = useKeyboardState(port);
 

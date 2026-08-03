@@ -1,5 +1,7 @@
 import { MidiInputHub } from '../../core/midi/midiInputHub';
-import type { ClockSample } from '../audio/audioClock';
+import type { MidiInputPort } from '../../core/midi/types';
+import type { MidiOutputPort } from '../../core/midi/output';
+import { WebMidiOutput } from './webMidiOutput';
 
 export type MidiUnavailableReason = 'unsupported' | 'insecure-context' | 'denied' | 'failed';
 
@@ -22,11 +24,20 @@ const MESSAGES: Record<MidiUnavailableReason, string> = {
   failed: 'Could not start Web MIDI.',
 };
 
+/** Your keyboard, both ways round: what you play, and what the guide plays. */
+export interface WebMidiPorts {
+  input: MidiInputPort;
+  output: MidiOutputPort;
+  close(): void;
+}
+
 /**
- * The only file in the app that knows `navigator.requestMIDIAccess` exists.
- * Everything else talks to `MidiInputPort`.
+ * The only place in the app that knows `navigator.requestMIDIAccess` exists.
+ * Everything else talks to `MidiInputPort` and `MidiOutputPort`.
+ *
+ * Both ports come from one `MIDIAccess` — asking twice would prompt twice.
  */
-export async function openWebMidi(sample: () => ClockSample): Promise<WebMidiInput> {
+export async function openWebMidi(): Promise<WebMidiPorts> {
   if (typeof navigator === 'undefined' || typeof navigator.requestMIDIAccess !== 'function') {
     throw unavailable('unsupported');
   }
@@ -34,13 +45,28 @@ export async function openWebMidi(sample: () => ClockSample): Promise<WebMidiInp
     throw unavailable('insecure-context');
   }
 
+  let access: MIDIAccess;
   try {
     // No `sysex: true`: it asks the user for a scarier permission than we need.
-    return new WebMidiInput(await navigator.requestMIDIAccess(), sample);
+    access = await navigator.requestMIDIAccess();
   } catch (cause) {
     const denied = cause instanceof DOMException && cause.name === 'SecurityError';
     throw unavailable(denied ? 'denied' : 'failed', cause);
   }
+
+  const output = new WebMidiOutput(access);
+  const input = new WebMidiInput(access, () => {
+    output.refresh();
+  });
+
+  return {
+    input,
+    output,
+    close() {
+      output.close();
+      input.close();
+    },
+  };
 }
 
 function unavailable(reason: MidiUnavailableReason, cause?: unknown): MidiUnavailableError {
@@ -50,15 +76,16 @@ function unavailable(reason: MidiUnavailableReason, cause?: unknown): MidiUnavai
 
 class WebMidiInput extends MidiInputHub {
   private readonly access: MIDIAccess;
-  private readonly sample: () => ClockSample;
+  private readonly onStateChange: () => void;
 
-  constructor(access: MIDIAccess, sample: () => ClockSample) {
+  constructor(access: MIDIAccess, onStateChange: () => void) {
     super();
     this.access = access;
-    this.sample = sample;
+    this.onStateChange = onStateChange;
     // Fires on every plug and unplug, which is all the hot-plug support we need.
     access.onstatechange = () => {
       this.refresh();
+      this.onStateChange();
     };
     this.refresh();
   }
@@ -87,8 +114,7 @@ class WebMidiInput extends MidiInputHub {
     for (const input of inputs) {
       input.onmidimessage = (event: MIDIMessageEvent) => {
         if (!event.data) return;
-        const { performanceTime, audioTime } = this.sample();
-        this.syncClock(performanceTime, audioTime);
+        // `event.timeStamp` is already the master clock — see ADR-0004.
         this.handleRawMessage(input.id, event.data, event.timeStamp);
       };
     }

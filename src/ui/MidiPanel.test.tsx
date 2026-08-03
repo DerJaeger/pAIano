@@ -4,11 +4,24 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MidiPanel } from './MidiPanel';
 import { FakeMidiInput } from '../core/midi/fakeMidiInput';
+import { RecordingMidiOutput } from '../core/midi/output';
 import { MidiUnavailableError } from '../adapters/midi/webMidiAdapter';
+import { useMidi, type OpenMidi } from './useMidi';
+
+/** The connection is owned by `App`; this stands in for that ownership. */
+function Harness({ open }: { open: OpenMidi }) {
+  return <MidiPanel connection={useMidi(open)} />;
+}
 
 async function connect(midi: FakeMidiInput = new FakeMidiInput()) {
   const user = userEvent.setup();
-  render(<MidiPanel open={() => Promise.resolve(midi)} />);
+  const open: OpenMidi = () =>
+    Promise.resolve({
+      input: midi,
+      output: new RecordingMidiOutput(),
+      close: () => midi.close(),
+    });
+  render(<Harness open={open} />);
   await user.click(screen.getByRole('button', { name: 'Connect a keyboard' }));
   return { midi, user };
 }
@@ -86,7 +99,7 @@ describe('MidiPanel', () => {
   it('explains why MIDI is unavailable instead of failing silently', async () => {
     const user = userEvent.setup();
     render(
-      <MidiPanel
+      <Harness
         open={() =>
           Promise.reject(new MidiUnavailableError('unsupported', 'This browser has no Web MIDI.'))
         }
