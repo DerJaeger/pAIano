@@ -1,0 +1,251 @@
+# Web PianoBooster — Project Plan
+
+A browser-based, fully client-side piano practice trainer in the spirit of
+[PianoBooster](https://github.com/pianobooster/PianoBooster): load a score, see the notation,
+play along on a MIDI keyboard, and get real-time feedback on whether you hit the right notes at
+the right time.
+
+No backend. No upload. Your files stay on your machine.
+
+---
+
+## 1. Product scope
+
+### Core loop (MVP)
+1. Pick a MIDI keyboard from the browser (Web MIDI).
+2. Open a score from a local file or folder.
+3. See the sheet music rendered, with a cursor tracking the current position.
+4. Hear a guide track (soundfont piano) for the parts you're *not* playing.
+5. Play along. Correct notes light up green, wrong/missed notes red.
+6. Practice modes: **Listen** (play it for me), **Follow You** (wait for the right note before
+   advancing), **Play Along** (fixed tempo, score me).
+7. Per-hand selection (right / left / both), tempo scaling, loop a bar range, transpose.
+
+### Deliberately out of MVP
+- PDF display path (Phase 7)
+- MuseScore.com integration (Phase 8)
+- Recording/replay, MIDI export of your performance
+- Multi-instrument beyond piano
+
+---
+
+## 2. Platform reality check
+
+These constrain the design and are worth knowing before we write code:
+
+| Capability | Status |
+|---|---|
+| **Web MIDI** (`navigator.requestMIDIAccess`) | Chrome/Edge/Opera/Samsung by default; Firefox 108+ via a one-time site-permission add-on. **Safari does not support it** and WebKit has no roadmap — Safari is out of scope, we detect and show a clear message. Requires a secure context (https or localhost). |
+| **File System Access API** (folder picking, persistent handles in IndexedDB) | Chromium only. Firefox needs a fallback: `<input type="file" webkitdirectory>` (re-pick each session) plus drag-and-drop. |
+| **Web Audio** | Universal. Master clock for all timing. |
+| **Everything client-side** | Yes — the whole app is static files. Deployable to GitHub Pages. |
+
+**Target:** Chromium-first, Firefox best-effort, Safari explicitly unsupported.
+
+---
+
+## 3. Architecture
+
+The single most important decision for TDD: **the core is pure TypeScript with zero
+DOM/Audio/MIDI dependencies**, and every browser API sits behind a port interface with a fake
+implementation for tests.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  UI (React)                                             │
+│  device picker · library browser · sheet view · HUD     │
+└───────────────┬─────────────────────────────────────────┘
+                │
+┌───────────────▼─────────────────────────────────────────┐
+│  CORE  (pure, 100% unit-tested, no browser globals)     │
+│                                                          │
+│  score/      MusicXML → Score model, NoteEvent stream    │
+│  transport/  clock, tempo map, position, looping         │
+│  practice/   matcher, wait-mode gating, scoring          │
+│  midi/       SMF parse/write, message encode/decode      │
+└───┬──────────┬──────────┬──────────┬────────────────────┘
+    │ ports    │          │          │
+┌───▼───┐ ┌────▼─────┐ ┌──▼──────┐ ┌─▼──────────┐
+│MidiIn │ │AudioSink │ │ Notation│ │ Library    │
+│Port   │ │Port      │ │ Port    │ │ Port       │
+├───────┤ ├──────────┤ ├─────────┤ ├────────────┤
+│WebMIDI│ │soundfont │ │  OSMD   │ │FS Access / │
+│adapter│ │adapter   │ │ adapter │ │input+IDB   │
+└───────┘ └──────────┘ └─────────┘ └────────────┘
+```
+
+Each port gets a fake (`FakeMidiInput`, `FakeClock`, `RecordingAudioSink`) so the practice engine
+can be driven deterministically in unit tests — no audio hardware, no keyboard, no timers.
+
+### Timing model
+- **Master clock is `AudioContext.currentTime`**, not `setTimeout`/rAF. Notes are scheduled ahead
+  with a lookahead window (~100ms) refreshed by a 25ms ticker (the classic "Tale of Two Clocks"
+  pattern). rAF only drives *visual* interpolation.
+- Web MIDI input events arrive with `event.timeStamp` in the `performance.now()` domain. We map
+  that to audio time once via `AudioContext.getOutputTimestamp()` + `baseLatency`, so input
+  timing accuracy doesn't depend on when React happens to render.
+- `Transport` in core is clock-agnostic: it takes a `now(): seconds` function. Tests inject a
+  fake clock and step it manually.
+
+### Score model
+MusicXML is the **single source of truth** for both notation and timing. This sidesteps the hard
+problem of aligning a separately-exported MIDI file to a separately-exported XML file (differing
+repeats, pickup bars, ornaments). A paired `.mid` is optional and only used as an alternative
+audio guide.
+
+```ts
+Score {
+  parts: Part[]           // with a hand hint (staff 1/2 → right/left)
+  measures: Measure[]     // bar numbers, time sigs, repeat structure
+  tempoMap: TempoMap      // tick ↔ seconds, handles tempo changes
+  events: NoteEvent[]     // flattened, repeat-expanded, sorted by time
+}
+NoteEvent { midiNote, startTick, durationTicks, partId, staff, voice, tie, xmlId }
+```
+`xmlId` links a core event back to the SVG element OSMD rendered, so highlighting is a lookup,
+not a guess.
+
+---
+
+## 4. Tech choices
+
+| Concern | Choice | Why |
+|---|---|---|
+| Build/stack | **Vite + React + TypeScript (strict)** | Fast HMR, best ecosystem fit for OSMD/pdf.js. |
+| Notation | **OpenSheetMusicDisplay** (MusicXML → VexFlow → SVG) | Has a cursor API, per-note SVG handles, actively used for exactly this. |
+| Guide audio | **soundfont via Web Audio** (`smplr` or `soundfont-player`) | Self-contained, offline, no hardware needed. Sits behind `AudioSinkPort` so MIDI-out can be added later without touching core. |
+| MIDI device | **Web MIDI API** directly (thin adapter, no `webmidi.js` dep) | The API is small; a wrapper adds surface area we'd have to fake anyway. |
+| SMF parsing | `@tonejs/midi` **or** hand-rolled | Decide in Phase 1 spike; hand-rolled is ~300 LOC and perfectly testable. |
+| `.mscz` ingest | **webmscore** (libmscore in WASM) — *optional, Phase 6* | Reads `.mscz` natively and emits MusicXML/MIDI/SVG client-side. Caveat: based on MuseScore 3, lightly maintained, multi-MB WASM. Kept behind a lazy-loaded adapter so it can be dropped. |
+| PDF | `pdf.js` — *Phase 7* | |
+| Unit/integration tests | **Vitest** + Testing Library | |
+| E2E | **Playwright** (Chromium) | Can fake Web MIDI by injecting a stub `navigator.requestMIDIAccess` before page load. |
+| Lint/format | ESLint + Prettier, enforced in CI | |
+| CI | GitHub Actions: typecheck → lint → test → build → deploy Pages | |
+
+---
+
+## 5. Delivery phases
+
+Each phase is a branch → PR → merge, red-green-refactor throughout, and ends with something
+demonstrable.
+
+### Phase 0 — Foundations
+- `git init`, conventional commits, `main` protected by CI.
+- Vite + React + TS strict, Vitest, Playwright, ESLint/Prettier, GH Actions.
+- `docs/adr/` for architecture decision records; ADR-0001 records the choices in §4.
+- **Done when:** `npm test` runs a passing trivial test in CI and the app deploys to Pages.
+
+### Phase 1 — Score core *(pure, no UI)*
+- MusicXML parse → `Score` model: parts, staves, voices, ties, tuplets, key/time sigs.
+- Repeat expansion (repeats, voltas, D.C./D.S./Coda) into a flat `NoteEvent[]`.
+- `TempoMap`: tick ↔ seconds with tempo changes.
+- SMF parser (if we keep the optional MIDI path).
+- **Tests:** a corpus of small fixture `.musicxml` files (single note, chord, tie across barline,
+  triplet, 1st/2nd ending, D.S. al Coda, pickup bar, tempo change) each with an expected event
+  list. This is the highest-value test suite in the project — everything downstream trusts it.
+- **Done when:** given a real MuseScore export, we produce a correct timed note stream.
+
+### Phase 2 — MIDI input
+- `MidiInputPort`: device enumeration, hot-plug, note on/off (incl. note-on velocity 0),
+  sustain pedal CC64, timestamps normalized to audio time.
+- `WebMidiAdapter` + `FakeMidiInput`.
+- UI: device picker, live "keys currently down" indicator.
+- **Done when:** pressing a key on your keyboard lights up on screen.
+
+### Phase 3 — Notation view
+- `NotationPort` + OSMD adapter: render, cursor to position, highlight/color a note by `xmlId`.
+- Responsive layout, page/scroll mode, zoom.
+- **Tests:** adapter is thin and covered by Playwright screenshot/DOM assertions; core stays
+  untouched by OSMD types.
+- **Done when:** a MuseScore export renders and a cursor can be driven to any bar.
+
+### Phase 4 — Transport & guide playback
+- `Transport`: play/pause/stop/seek, tempo scaling, bar-range loop, count-in.
+- Lookahead scheduler → `AudioSinkPort` → soundfont adapter.
+- Per-part mute/solo (mute the hand you're practising).
+- Cursor follows playback smoothly.
+- **Tests:** transport driven by `FakeClock` against a `RecordingAudioSink`, asserting exact
+  scheduled (time, note) pairs. Fully deterministic.
+- **Done when:** press play, hear the piece, watch the cursor track it.
+
+### Phase 5 — Practice engine *(the heart)*
+- `Matcher`: for the expected notes at position *t*, classify incoming input as correct / wrong /
+  early / late / missed, with a configurable timing tolerance and chord grouping.
+- Modes: **Listen**, **Follow You** (transport gates until the required chord is fully held),
+  **Play Along** (fixed tempo, accuracy + timing score).
+- Feedback: note coloring, running accuracy, per-bar error heatmap, end-of-run summary.
+- **Tests:** table-driven — feed scripted input event sequences through `FakeMidiInput` +
+  `FakeClock`, assert exact classifications. Covers the nasty cases: rolled chords, extra notes,
+  repeated same note, pedal-held notes, wrong octave.
+- **Done when:** you can actually practise a piece and the feedback feels fair.
+
+### Phase 6 — Library
+- Open a single file, or a folder recursively (FS Access API), or drag-and-drop.
+- Persist directory handles + per-score progress in IndexedDB; re-request permission on return.
+- Score list with search, favourites, and **learning sets** (user-defined collections).
+- Optional `.mscz` support via lazy-loaded webmscore.
+- **Done when:** point it at your MuseScore folder once, and your library is just there.
+
+### Phase 7 — PDF path (option 1 from the brief)
+- Pair a `.pdf` with a `.mid`, render pages with pdf.js, play the MIDI as the guide.
+- Position feedback limited to a **manually calibrated per-page/per-system marker** — be honest
+  that note-level sync is not achievable from a PDF without OMR. This path is for scores where no
+  MusicXML exists.
+- **Done when:** PDF + MIDI plays with page turns and a coarse position bar.
+
+### Phase 8 — MuseScore.com integration (spike first, then decide)
+Open question, needs a timeboxed investigation before any commitment:
+- `developers.musescore.com` documents a REST API requiring a consumer key obtained by emailing
+  `api@musescore.com`. It's legacy and widely reported as effectively closed to new registrations
+  — **verify before planning against it.**
+- Also CORS-hostile: a purely client-side app may be unable to call it at all without a proxy,
+  which breaks the "no backend" property.
+- Legal constraint we should respect: downloading paid/copyrighted scores off musescore.com
+  outside their client violates their ToS. Scope any integration to **public-domain / OpenScore
+  material and your own uploads**.
+- Fallback that needs none of the above and delivers most of the value: **favourites and learning
+  sets live in this app**, referencing local files. That's already Phase 6.
+
+---
+
+## 6. Testing strategy
+
+- **TDD by default** — a failing test precedes the implementation for all core logic.
+- **Unit (Vitest, fast, ~ms):** everything in `core/`. Target near-total coverage here; this is
+  where correctness lives.
+- **Fixture corpus:** hand-written minimal `.musicxml`/`.mid` files, each a named musical edge
+  case. Grows every time we hit a real-world bug — every bug fix starts with a new fixture.
+- **Adapter tests:** thin, mostly verifying we translate browser events into port events faithfully.
+- **E2E (Playwright):** device selection with a stubbed Web MIDI, load fixture score, play,
+  simulate correct/incorrect input, assert visual feedback. A handful of high-value journeys, not
+  a pyramid inversion.
+- **Golden/perf checks:** render a large score (e.g. a full sonata movement) and assert render
+  time and scheduler jitter stay within budget.
+
+---
+
+## 7. Main risks
+
+| Risk | Mitigation |
+|---|---|
+| MusicXML repeat expansion is genuinely fiddly | Own it in core, fixture-driven, done early in Phase 1 where it's cheap. |
+| OSMD cursor/highlight API may not expose what we need | Spike it in Phase 0/3 before committing; `NotationPort` keeps a swap to Verovio possible. |
+| Timing jitter makes scoring feel unfair | Audio-clock scheduling from day one; measure input latency and expose a calibration slider. |
+| webmscore is a heavy, lightly maintained WASM dep | Optional, lazy-loaded, behind an adapter. MusicXML export from MuseScore is always the reliable path. |
+| MuseScore API turns out to be unavailable | Phase 8 is a spike, not a commitment; local learning sets deliver the value regardless. |
+| Safari users | Detect and tell them plainly, up front. |
+
+---
+
+## 8. Immediate next steps
+
+1. Set up the repo and CI (Phase 0).
+2. Two short spikes, throwaway code, timeboxed:
+   - **Spike A:** OSMD renders one of your real MuseScore exports, and we can move the cursor and
+     recolor a specific notehead.
+   - **Spike B:** Web MIDI reads your keyboard and we log timestamped note events.
+3. Record the outcomes as ADRs, then start Phase 1 test-first.
+
+Both spikes de-risk the two assumptions everything else rests on. Nothing after them is
+speculative.
