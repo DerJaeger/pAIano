@@ -74,6 +74,102 @@ h1 {
   color: #b3261e;
 }
 
+.muted {
+  color: var(--muted);
+}
+
+.midi {
+  margin-bottom: 2rem;
+}
+
+.midi-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.midi h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  flex: 1;
+}
+
+.midi-header p {
+  margin: 0;
+}
+
+button.button {
+  border: 0;
+  font: inherit;
+  font-weight: 600;
+}
+
+button.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.device-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.device-picker select {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  padding: 0.3rem 0.4rem;
+}
+
+/* Keys are absolutely positioned by percentage — see ui/pianoLayout.ts. */
+.piano {
+  position: relative;
+  height: 5rem;
+  margin-top: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.piano-key {
+  position: absolute;
+  top: 0;
+  border-radius: 0 0 0.2rem 0.2rem;
+}
+
+.piano-key.white {
+  height: 100%;
+  background: #fdfdfc;
+  border-right: 1px solid var(--line);
+}
+
+.piano-key.black {
+  height: 62%;
+  background: #22201d;
+  z-index: 1;
+}
+
+.piano-key.down {
+  background: var(--accent);
+}
+
+.piano-key.sustained {
+  background: color-mix(in srgb, var(--accent) 45%, #fdfdfc);
+}
+
+.keys-down {
+  margin: 0.5rem 0 0;
+  font-variant-numeric: tabular-nums;
+  min-height: 1.2em;
+}
+
 .summary {
   margin-top: 2.5rem;
 }

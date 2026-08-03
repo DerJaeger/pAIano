@@ -14,14 +14,15 @@ See [PLAN.md](PLAN.md) for the full product plan and delivery phases.
 | ------------------------------ | --------------------------------------------------------------- |
 | 0 — Foundations                | ✅ Vite + React + TS strict, Vitest, ESLint/Prettier, CI, Pages |
 | 1 — Score core                 | ✅ MusicXML/`.mxl` → timed note stream                          |
-| 2 — MIDI input                 | ⬜ next                                                         |
-| 3 — Notation view (OSMD)       | ⬜                                                              |
+| 2 — MIDI input                 | ✅ device picker, live keys-down, sustain pedal                 |
+| 3 — Notation view (OSMD)       | ⬜ next                                                         |
 | 4 — Transport & guide playback | ⬜                                                              |
 | 5 — Practice engine            | ⬜                                                              |
 | 6 — Library                    | ⬜                                                              |
 
-Today the app opens a MusicXML or `.mxl` file and shows what the parser understood: parts, measures,
-repeat-expanded duration, tempo map and the note stream.
+Today the app connects to a MIDI keyboard and lights up the keys you play (sustain pedal included),
+and opens a MusicXML or `.mxl` file to show what the parser understood: parts, measures,
+repeat-expanded duration, tempo map and the note stream. The two halves meet in Phase 5.
 
 ## Develop
 
@@ -29,10 +30,13 @@ repeat-expanded duration, tempo map and the note stream.
 npm install
 npm run dev        # http://localhost:5173
 npm test           # unit + integration (Vitest)
+npm run test:e2e   # Playwright, Chromium with a stubbed MIDI keyboard
 npm run lint       # ESLint
 npm run typecheck  # tsc
 npm run build      # production build into dist/
 ```
+
+`npm run test:e2e` needs the browser once: `npx playwright install chromium`.
 
 ## Architecture
 
@@ -46,7 +50,12 @@ src/
     xml/         ordered XML reader (MusicXML is order-sensitive)
     score/       Score model, tempo map, .mxl container
       musicxml/  parser, repeat expansion, fixture corpus
+    midi/        message decoding, keyboard state, input port + fake
+  adapters/
+    midi/        Web MIDI  → MidiInputPort
+    audio/       AudioContext clock, for timestamping input
   ui/            React shell
+tests/           Playwright journeys
 ```
 
 ## Browser support

@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { readMusicXmlSource } from '../core/score/mxl';
 import { parseMusicXml } from '../core/score/musicxml/parseMusicXml';
 import type { Score } from '../core/score/types';
+import { MidiPanel } from './MidiPanel';
 import { ScoreSummary } from './ScoreSummary';
 
 /**
- * Phase 1 shell: open a score and show what the parser made of it. The
- * notation view (Phase 3) and transport (Phase 4) land on top of this.
+ * The shell so far: connect a keyboard (Phase 2) and open a score (Phase 1).
+ * The notation view (Phase 3) and transport (Phase 4) land on top of this.
  */
 export function App() {
   const [score, setScore] = useState<Score | undefined>(undefined);
@@ -34,6 +35,8 @@ export function App() {
           leave your machine.
         </p>
       </header>
+
+      <MidiPanel />
 
       <section
         className="dropzone"
