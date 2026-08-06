@@ -180,7 +180,7 @@ out from under you whenever you reached for pause — and the cursor became **ou
 interpolated between notes from the clock instead of stepping voice entry to voice entry. The
 geometry arithmetic lives in `core/notation/layout.ts`; the OSMD adapter only reports pixel boxes.
 
-### Phase 5 — Practice engine *(the heart)*
+### Phase 5 — Practice engine *(the heart)* ✅
 - `Matcher`: for the expected notes at position *t*, classify incoming input as correct / wrong /
   early / late / missed, with a configurable timing tolerance and chord grouping.
 - Modes: **Listen**, **Follow You** (transport gates until the required chord is fully held),
@@ -190,6 +190,18 @@ geometry arithmetic lives in `core/notation/layout.ts`; the OSMD adapter only re
   `FakeClock`, assert exact classifications. Covers the nasty cases: rolled chords, extra notes,
   repeated same note, pedal-held notes, wrong octave.
 - **Done when:** you can actually practise a piece and the feedback feels fair.
+
+Three decisions are recorded in [ADR-0005](docs/adr/0005-practice-engine.md). Timing tolerance
+is measured in **ticks, not milliseconds** — an eighth-note window stays an eighth-note window at
+half speed, where a fixed millisecond window would get stricter exactly when a learner needs it
+not to. A press claims the **nearest unplayed note of that pitch within the window**, and the
+awkward cases fall out of that one rule rather than being special-cased. And **Follow You waits
+by pausing the transport and seeking back to the chord's own tick**, rather than `Transport`
+growing a fourth state — which also gives "press play instead of the note" a useful meaning:
+skip the one you cannot get.
+
+Which notes are yours to play is not a new setting: they are exactly the ones the guide has been
+muted out of, so Phase 4's mute checkboxes do both jobs and cannot drift apart.
 
 ### Phase 6 — Library
 - Open a single file, or a folder recursively (FS Access API), or drag-and-drop.

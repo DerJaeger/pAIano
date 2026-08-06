@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createOsmdNotation } from '../adapters/notation/osmdAdapter';
 import { notesInMeasure } from '../core/notation/position';
-import type { NotationPort, WrittenPosition } from '../core/notation/types';
+import type { NotationPort, NoteHighlight, WrittenPosition } from '../core/notation/types';
 import type { Score } from '../core/score/types';
 
 export type CreateNotation = (
@@ -22,6 +22,8 @@ const DEFAULT_ZOOM_STEP = ZOOM_STEPS.indexOf(1);
  */
 const VISIBLE_SYSTEMS = 3;
 
+const NO_FEEDBACK: readonly NoteHighlight[] = [];
+
 /**
  * The sheet music and the controls for moving around it.
  *
@@ -33,12 +35,15 @@ export function ScoreView({
   score,
   musicXml,
   position,
+  feedback = NO_FEEDBACK,
   onSeekBar,
   createNotation = createOsmdNotation,
 }: {
   score: Score;
   musicXml: string;
   position: WrittenPosition;
+  /** How the notes you have played were judged; drawn over the bar highlight. */
+  feedback?: readonly NoteHighlight[];
   onSeekBar: (measureIndex: number) => void;
   createNotation?: CreateNotation;
 }) {
@@ -89,10 +94,13 @@ export function ScoreView({
 
   useEffect(() => {
     if (!notation) return;
-    notation.highlight(
-      notesInMeasure(score, bar).map((note) => ({ note, color: HIGHLIGHT_COLOR })),
-    );
-  }, [notation, score, bar]);
+    // Feedback last: a note you have played should show how you played it, not
+    // that the cursor happens to be on its bar.
+    notation.highlight([
+      ...notesInMeasure(score, bar).map((note) => ({ note, color: HIGHLIGHT_COLOR })),
+      ...feedback,
+    ]);
+  }, [notation, score, bar, feedback]);
 
   useEffect(() => {
     notation?.setZoom(ZOOM_STEPS[zoomStep]!);

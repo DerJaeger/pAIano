@@ -1,15 +1,18 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { writtenPositionAt } from '../core/notation/position';
 import type { WrittenPosition } from '../core/notation/types';
 import { readMusicXmlSource } from '../core/score/mxl';
 import { parseMusicXml } from '../core/score/musicxml/parseMusicXml';
 import type { Score } from '../core/score/types';
+import { feedbackHighlights } from './feedback';
 import { MidiPanel } from './MidiPanel';
+import { PracticePanel } from './PracticePanel';
 import { ScoreSummary } from './ScoreSummary';
 import { ScoreView } from './ScoreView';
 import { TransportPanel } from './TransportPanel';
 import { openWebMidi } from '../adapters/midi/webMidiAdapter';
 import { useMidi, type OpenMidi } from './useMidi';
+import { usePractice, usePracticeState } from './usePractice';
 import { useTransport, useTransportPosition } from './useTransport';
 
 interface OpenedScore {
@@ -33,6 +36,9 @@ export function App({ open = openWebMidi }: { open?: OpenMidi } = {}) {
   const midi = useMidi(open);
   const transport = useTransport(opened?.score, midi.output);
   const positionTick = useTransportPosition(transport);
+  const session = usePractice(opened?.score, transport, midi.input);
+  const practice = usePracticeState(session);
+  const feedback = useMemo(() => feedbackHighlights(practice.results), [practice.results]);
   // Without an instrument there is no transport, but the score is still worth
   // reading, so browsing bars keeps working on its own.
   const [browsedBar, setBrowsedBar] = useState(0);
@@ -114,10 +120,18 @@ export function App({ open = openWebMidi }: { open?: OpenMidi } = {}) {
             output={midi.output}
             positionTick={positionTick}
           />
+          <PracticePanel
+            score={opened.score}
+            session={session}
+            practice={practice}
+            transport={transport}
+            onSeekBar={seekBar}
+          />
           <ScoreView
             score={opened.score}
             musicXml={opened.musicXml}
             position={position}
+            feedback={feedback}
             onSeekBar={seekBar}
           />
           <ScoreSummary score={opened.score} />

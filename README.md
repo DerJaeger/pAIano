@@ -17,18 +17,29 @@ See [PLAN.md](PLAN.md) for the full product plan and delivery phases.
 | 2 — MIDI input                 | ✅ device picker, live keys-down, sustain pedal                 |
 | 3 — Notation view (OSMD)       | ✅ engraved score, cursor to any bar, per-note colouring        |
 | 4 — Transport & guide playback | ✅ play/pause/seek, tempo, bar loop, count-in, per-hand mute    |
-| 5 — Practice engine            | ⬜ next                                                         |
-| 6 — Library                    | ⬜                                                              |
+| 5 — Practice engine            | ✅ Listen / Follow you / Play along, scored feedback            |
+| 6 — Library                    | ⬜ next                                                         |
 
 Today the app connects to a MIDI keyboard and lights up the keys you play (sustain pedal included),
 and opens a MusicXML or `.mxl` file: it engraves the score, and plays it back **through your own
 instrument over MIDI out** — at any speed, looping the bar you are stuck on, with the hand you are
-practising muted — while the cursor tracks the music. Underneath it still shows what the parser
-understood: parts, measures, repeat-expanded duration, tempo map and the note stream.
+practising muted — while the cursor tracks the music.
+
+And now you can practise against it. Pick a mode:
+
+- **Listen** — play it for me; nothing is judged.
+- **Follow you** — the music waits on each chord until you have played it, however long you take.
+  Press play instead of the note to skip one you cannot get.
+- **Play along** — fixed tempo, and you are scored on notes _and_ timing.
+
+Notes you play turn green, amber for the right note out of time, red for wrong or missed, and a
+bar-by-bar strip shows where the run fell apart — click a bar to go back and take it again. The
+notes you are expected to play are the ones you muted the guide out of, so there is no second
+setting to keep in step. See [ADR-0005](docs/adr/0005-practice-engine.md) for why the timing
+window is measured in ticks rather than milliseconds.
 
 The guide needs an instrument that accepts incoming MIDI, and most keyboards want their
-&ldquo;local control off&rdquo; setting so the guide does not fight your own playing. Your playing
-and the score meet in Phase 5.
+&ldquo;local control off&rdquo; setting so the guide does not fight your own playing.
 
 ## Develop
 
@@ -59,6 +70,7 @@ src/
     midi/        message decoding, keyboard state, input + output ports + fakes
     notation/    notation port + fake, written ↔ expanded positions
     transport/   clock, tick ↔ time timeline, lookahead scheduler
+    practice/    what you owe, what you played, how it scored
   adapters/
     midi/        Web MIDI → MidiInputPort / MidiOutputPort
     notation/    OpenSheetMusicDisplay → NotationPort

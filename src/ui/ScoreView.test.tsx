@@ -60,6 +60,28 @@ describe('ScoreView', () => {
     ]);
   });
 
+  it('draws practice feedback over the bar highlight', async () => {
+    const notation = new FakeNotation();
+    const red = { note: { measureIndex: 0, midiNote: 62, tickInMeasure: 96 }, color: '#a3231b' };
+    render(
+      <ScoreView
+        score={score}
+        musicXml={musicXml}
+        position={{ measureIndex: 0, tickInMeasure: 0, pass: 0 }}
+        feedback={[red]}
+        onSeekBar={() => undefined}
+        createNotation={() => Promise.resolve(notation)}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(notation.highlights).toHaveLength(5);
+    });
+    // Last wins in the renderer, so the note you got wrong shows as wrong
+    // rather than as "on the bar the cursor is on".
+    expect(notation.highlights[4]).toEqual(red);
+  });
+
   it('drives the cursor to any bar', async () => {
     const { notation, user } = await show();
 
