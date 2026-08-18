@@ -132,6 +132,7 @@ export function App({ open = openWebMidi }: { open?: OpenMidi } = {}) {
             musicXml={opened.musicXml}
             position={position}
             feedback={feedback}
+            input={midi.input}
             onSeekBar={seekBar}
           />
           <ScoreSummary score={opened.score} />

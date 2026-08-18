@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createOsmdNotation } from '../adapters/notation/osmdAdapter';
 import { notesInMeasure } from '../core/notation/position';
 import type { NotationPort, NoteHighlight, WrittenPosition } from '../core/notation/types';
+import type { MidiInputPort } from '../core/midi/types';
 import type { Score } from '../core/score/types';
+import { pitchColorHighlights } from './noteColors';
+import { useKeyboardState } from './useMidi';
 
 export type CreateNotation = (
   container: HTMLElement,
@@ -24,18 +27,42 @@ const VISIBLE_SYSTEMS = 3;
 
 const NO_FEEDBACK: readonly NoteHighlight[] = [];
 
+const NO_NOTES: readonly number[] = [];
+
+/**
+ * What the sheet shows beyond the engraving itself. All three are reading aids
+ * you grow out of, so they are switches rather than settings: `yourKeys` starts
+ * on because it costs nothing until you touch the keyboard, the other two start
+ * off because a fluent reader wants a clean page.
+ */
+interface SheetOptions {
+  noteNames: boolean;
+  pitchColors: boolean;
+  yourKeys: boolean;
+}
+
+const DEFAULT_OPTIONS: SheetOptions = { noteNames: false, pitchColors: false, yourKeys: true };
+
+const OPTION_LABELS: { key: keyof SheetOptions; label: string }[] = [
+  { key: 'noteNames', label: 'Note names' },
+  { key: 'pitchColors', label: 'Colour by pitch' },
+  { key: 'yourKeys', label: 'Show what I play' },
+];
+
 /**
  * The sheet music and the controls for moving around it.
  *
  * The position shown is a prop rather than local state: during playback the
  * transport owns it, and the bar buttons here are a seek request like any
- * other. Zoom stays local — that is a view preference, not a position.
+ * other. Zoom and the reading aids stay local — those are view preferences, not
+ * positions.
  */
 export function ScoreView({
   score,
   musicXml,
   position,
   feedback = NO_FEEDBACK,
+  input,
   onSeekBar,
   createNotation = createOsmdNotation,
 }: {
@@ -44,6 +71,8 @@ export function ScoreView({
   position: WrittenPosition;
   /** How the notes you have played were judged; drawn over the bar highlight. */
   feedback?: readonly NoteHighlight[];
+  /** The keyboard whose held keys are drawn on the staff, if one is connected. */
+  input?: MidiInputPort | undefined;
   onSeekBar: (measureIndex: number) => void;
   createNotation?: CreateNotation;
 }) {
@@ -54,7 +83,13 @@ export function ScoreView({
   const [notation, setNotation] = useState<NotationPort | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
   const [zoomStep, setZoomStep] = useState(DEFAULT_ZOOM_STEP);
+  const [options, setOptions] = useState(DEFAULT_OPTIONS);
+  const keyboard = useKeyboardState(input);
   const lastBar = score.measures.length - 1;
+  const colors = useMemo(
+    () => (options.pitchColors ? pitchColorHighlights(score) : []),
+    [score, options.pitchColors],
+  );
 
   useEffect(() => {
     const element = container.current;
@@ -94,13 +129,28 @@ export function ScoreView({
 
   useEffect(() => {
     if (!notation) return;
-    // Feedback last: a note you have played should show how you played it, not
-    // that the cursor happens to be on its bar.
+    // Later layers win. Pitch colours are the resting state of the page;
+    // the bar highlight is dropped while they are on, because losing the colour
+    // of exactly the bar you are playing defeats the point of them, and the
+    // playhead says where you are anyway. Feedback comes last either way: a
+    // note you have played should show how you played it, not that the cursor
+    // happens to be on its bar.
     notation.highlight([
-      ...notesInMeasure(score, bar).map((note) => ({ note, color: HIGHLIGHT_COLOR })),
+      ...colors,
+      ...(options.pitchColors
+        ? []
+        : notesInMeasure(score, bar).map((note) => ({ note, color: HIGHLIGHT_COLOR }))),
       ...feedback,
     ]);
-  }, [notation, score, bar, feedback]);
+  }, [notation, score, bar, feedback, colors, options.pitchColors]);
+
+  useEffect(() => {
+    notation?.setNoteLabels(options.noteNames);
+  }, [notation, options.noteNames]);
+
+  useEffect(() => {
+    notation?.showHeldNotes(options.yourKeys ? keyboard.keysDown : NO_NOTES);
+  }, [notation, options.yourKeys, keyboard.keysDown]);
 
   useEffect(() => {
     notation?.setZoom(ZOOM_STEPS[zoomStep]!);
@@ -174,6 +224,23 @@ export function ScoreView({
           </button>
         </div>
       </div>
+
+      <fieldset className="sheet-options">
+        <legend className="visually-hidden">Reading aids</legend>
+        {OPTION_LABELS.map(({ key, label }) => (
+          <label key={key}>
+            <input
+              type="checkbox"
+              checked={options[key]}
+              onChange={(event) => {
+                const { checked } = event.target;
+                setOptions((previous) => ({ ...previous, [key]: checked }));
+              }}
+            />
+            {label}
+          </label>
+        ))}
+      </fieldset>
 
       {error !== undefined && (
         <p role="alert" className="error">

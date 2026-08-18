@@ -1,12 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { playheadAt, systemWindow, type SheetLayout } from './layout';
+import { pitchYOnSystem, playheadAt, systemWindow, type SheetLayout } from './layout';
+import { diatonicStepOf } from './pitch';
 
 /**
  * Four systems of two measures each, 100px apart, every measure 200px wide
  * with four quarter-note entries 40px apart (ticksPerQuarter = 4).
+ *
+ * Each system carries a grand staff: a treble staff whose middle line (B4) is
+ * at 20px into the system and a bass staff whose middle line (D3) is at 60px,
+ * with 5px between one line-or-space and the next.
  */
+const grandStaff = (systemIndex: number, topPx: number) => [
+  {
+    systemIndex,
+    staffIndex: 0,
+    centerStep: diatonicStepOf(71),
+    stepPx: 5,
+    stepZeroPx: topPx + 20 + diatonicStepOf(71) * 5,
+  },
+  {
+    systemIndex,
+    staffIndex: 1,
+    centerStep: diatonicStepOf(50),
+    stepPx: 5,
+    stepZeroPx: topPx + 60 + diatonicStepOf(50) * 5,
+  },
+];
+
 const layout: SheetLayout = {
   heightPx: 380,
+  staves: [0, 1, 2, 3].flatMap((index) => grandStaff(index, index * 100)),
   systems: [
     { topPx: 0, heightPx: 80 },
     { topPx: 100, heightPx: 80 },
@@ -49,7 +72,9 @@ describe('systemWindow', () => {
   });
 
   it('has nothing to show without a layout', () => {
-    expect(systemWindow({ systems: [], measures: [], heightPx: 0 }, 0, 3)).toBeUndefined();
+    expect(
+      systemWindow({ systems: [], measures: [], staves: [], heightPx: 0 }, 0, 3),
+    ).toBeUndefined();
   });
 
   it('falls back to the top for a measure the renderer did not draw', () => {
@@ -62,7 +87,7 @@ describe('playheadAt', () => {
     playheadAt(layout, { measureIndex, tickInMeasure, pass: 0 });
 
   it('sits on the first note of a measure at its downbeat', () => {
-    expect(at(0, 0)).toEqual({ xPx: 20, topPx: 0, heightPx: 80 });
+    expect(at(0, 0)).toEqual({ xPx: 20, topPx: 0, heightPx: 80, systemIndex: 0 });
   });
 
   it('sits on each following note in turn', () => {
@@ -81,7 +106,7 @@ describe('playheadAt', () => {
   });
 
   it('follows the measure onto its own system', () => {
-    expect(at(3, 0)).toEqual({ xPx: 220, topPx: 100, heightPx: 80 });
+    expect(at(3, 0)).toEqual({ xPx: 220, topPx: 100, heightPx: 80, systemIndex: 1 });
   });
 
   it('has nothing to show past the end or before the start', () => {
@@ -97,3 +122,44 @@ describe('playheadAt', () => {
     expect(playheadAt(empty, { measureIndex: 0, tickInMeasure: 8, pass: 0 })?.xPx).toBe(100);
   });
 });
+
+describe('pitchYOnSystem', () => {
+  const y = (systemIndex: number, midiNote: number) =>
+    pitchYOnSystem(layout, systemIndex, diatonicStepOf(midiNote));
+
+  it('puts the middle line of the staff where the ruler says it is', () => {
+    expect(y(0, 71)).toBe(20); // B4, treble middle line
+    expect(y(0, 50)).toBe(60); // D3, bass middle line
+  });
+
+  it('climbs half a space per step, so higher notes are higher up', () => {
+    expect(y(0, 72)).toBe(15); // C5, the space above B4
+    expect(y(0, 69)).toBe(25); // A4, the space below
+    expect(y(0, 83)!).toBeLessThan(y(0, 60)!);
+  });
+
+  it('draws a sharp on the line of its letter', () => {
+    expect(y(0, 61)).toBe(y(0, 60));
+  });
+
+  it('takes the staff the note is nearest — the hand that would play it', () => {
+    // Middle C is a ledger line either way; either staff is a fair answer, but
+    // a high note belongs to the right hand and a low one to the left.
+    expect(y(0, 84)).toBe(staffY(0, 84, 20, 71));
+    expect(y(0, 36)).toBe(staffY(0, 36, 60, 50));
+  });
+
+  it('follows the system the playhead is on', () => {
+    expect(y(2, 71)).toBe(220);
+  });
+
+  it('has nowhere to draw on a line the renderer left empty', () => {
+    expect(pitchYOnSystem({ ...layout, staves: [] }, 0, diatonicStepOf(60))).toBeUndefined();
+  });
+});
+
+/** Where a note lands on the staff whose middle line is `middleMidi` at `middlePx`. */
+function staffY(systemIndex: number, midiNote: number, middlePx: number, middleMidi: number) {
+  const steps = diatonicStepOf(midiNote) - diatonicStepOf(middleMidi);
+  return systemIndex * 100 + middlePx - steps * 5;
+}

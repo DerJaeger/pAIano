@@ -33,10 +33,33 @@ export interface MeasureBox {
   entries: readonly EntryBox[];
 }
 
+/**
+ * One drawn staff — the five lines of one hand on one system — as a ruler that
+ * turns a written pitch into a height on the page.
+ *
+ * The renderer reports it by reading back notes it has already drawn, so no
+ * assumption about clefs, octave marks or staff spacing is baked in here: two
+ * notes a step apart are half a staff space apart, and everything else follows.
+ */
+export interface StaffRuler {
+  /** Index into `SheetLayout.systems`. */
+  systemIndex: number;
+  /** Identity of the staff across the sheet, e.g. `0` for the right hand. */
+  staffIndex: number;
+  /** Where diatonic step 0 would be, in page pixels. See `staffYAt`. */
+  stepZeroPx: number;
+  /** Distance between two lines-or-spaces; y grows downwards, pitch upwards. */
+  stepPx: number;
+  /** The middle of what this staff usually carries, in diatonic steps. */
+  centerStep: number;
+}
+
 export interface SheetLayout {
   systems: readonly SystemBox[];
   /** By written measure; a measure the renderer left out is simply absent. */
   measures: readonly MeasureBox[];
+  /** One per staff per system, wherever the renderer drew notes to read. */
+  staves: readonly StaffRuler[];
   /** Full height of the drawn page. */
   heightPx: number;
 }
@@ -51,6 +74,8 @@ export interface Playhead {
   xPx: number;
   topPx: number;
   heightPx: number;
+  /** Index into `SheetLayout.systems` — the line being played. */
+  systemIndex: number;
 }
 
 /**
@@ -93,7 +118,38 @@ export function playheadAt(
     xPx: playheadX(measure, position.tickInMeasure),
     topPx: system.topPx,
     heightPx: system.heightPx,
+    systemIndex: measure.systemIndex,
   };
+}
+
+/** Where a pitch sits on a staff, whether or not the score writes it there. */
+export function staffYAt(ruler: StaffRuler, diatonicStep: number): number {
+  return ruler.stepZeroPx - diatonicStep * ruler.stepPx;
+}
+
+/**
+ * How high on a system to draw a key someone is holding down.
+ *
+ * A grand staff draws the same pitch in two places, so the staff picked is the
+ * one the note is nearest to — which for a two-handed piece is the hand that
+ * would have played it, and for anything else is the only staff there is.
+ * `undefined` means the renderer drew no notes on that line to measure against.
+ */
+export function pitchYOnSystem(
+  layout: SheetLayout,
+  systemIndex: number,
+  diatonicStep: number,
+): number | undefined {
+  let nearest: StaffRuler | undefined;
+  let distance = Infinity;
+  for (const ruler of layout.staves) {
+    if (ruler.systemIndex !== systemIndex) continue;
+    const away = Math.abs(diatonicStep - ruler.centerStep);
+    if (away >= distance) continue;
+    distance = away;
+    nearest = ruler;
+  }
+  return nearest && staffYAt(nearest, diatonicStep);
 }
 
 /**

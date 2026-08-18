@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
-import { attributes, note, score } from '../src/core/score/musicxml/fixtures';
+import { attributes, backup, note, score } from '../src/core/score/musicxml/fixtures';
+import { play, stubMidiKeyboard } from './midiStub';
 
 /**
  * Phase 3's acceptance journey: a MusicXML score is engraved in the browser and
@@ -99,6 +100,90 @@ test('keeps the highlight after zooming', async ({ page }) => {
   await expect(page.getByText('125%')).toBeVisible();
   await expect(page.locator('.sheet svg')).toBeVisible();
   await expect(highlighted(page)).toHaveCount(4);
+});
+
+test('writes the note names on the sheet on request', async ({ page }) => {
+  await openScore(page);
+  await expect(page.locator('.note-label')).toHaveCount(0);
+
+  await page.getByLabel('Note names').check();
+  // Seven notes: four in bar 1, the whole note, and both notes of the chord.
+  await expect(page.locator('.note-label')).toHaveCount(7);
+  await expect(page.locator('.note-label').first()).toHaveText('C');
+
+  // A redraw does not lose them: they are ours, not part of the engraving.
+  await page.getByRole('button', { name: 'Zoom in' }).click();
+  await expect(page.getByText('125%')).toBeVisible();
+  await expect(page.locator('.note-label')).toHaveCount(7);
+
+  await page.getByLabel('Note names').uncheck();
+  await expect(page.locator('.note-label')).toHaveCount(0);
+});
+
+test('colours the notes by pitch on request', async ({ page }) => {
+  await openScore(page);
+  await expect(highlighted(page)).toHaveCount(4);
+
+  await page.getByLabel('Colour by pitch').check();
+  // Pitch colours replace the bar highlight rather than fighting it, and each
+  // of C, D, E, F, G gets its own — the C in bar 3 shares the C in bar 1.
+  await expect(highlighted(page)).toHaveCount(0);
+  for (const color of ['#d32f2f', '#ef6c00', '#7f8400', '#4c8a1f', '#00786e']) {
+    await expect(page.locator(`.sheet svg [fill="${color}"]`).first()).toBeVisible();
+  }
+
+  await page.getByLabel('Colour by pitch').uncheck();
+  await expect(highlighted(page)).toHaveCount(4);
+  await expect(page.locator('.sheet svg [fill="#d32f2f"]')).toHaveCount(0);
+});
+
+/** A grand staff, so a held key has to pick a hand to be drawn on. */
+const grandStaff = score([
+  [
+    `<attributes>
+      <divisions>1</divisions><key><fifths>0</fifths></key>
+      <time><beats>4</beats><beat-type>4</beat-type></time>
+      <staves>2</staves>
+      <clef number="1"><sign>G</sign><line>2</line></clef>
+      <clef number="2"><sign>F</sign><line>4</line></clef>
+    </attributes>
+    ${note('G', 4, 4, { staff: 1 })}${backup(4)}${note('C', 3, 4, { staff: 2 })}`,
+  ],
+]);
+
+test('draws the keys you are holding on the staff at their own pitch', async ({ page }) => {
+  await stubMidiKeyboard(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Connect a keyboard' }).click();
+  await page.getByLabel('Open a score').setInputFiles({
+    name: 'grand-staff.musicxml',
+    mimeType: 'application/vnd.recordare.musicxml+xml',
+    buffer: Buffer.from(grandStaff, 'utf8'),
+  });
+  await expect(page.locator('.sheet svg')).toBeVisible();
+
+  const bar = (midiNote: number) => page.locator(`.held-note[data-note="${String(midiNote)}"]`);
+  const topOf = (midiNote: number) =>
+    bar(midiNote).evaluate((element) => (element as HTMLElement).offsetTop);
+
+  await play(page, [0x90, 67, 100]); // G4, on the right hand's staff
+  await play(page, [0x90, 48, 100]); // C3, on the left hand's
+  await expect(bar(67)).toBeVisible();
+  await expect(bar(48)).toBeVisible();
+  expect(await topOf(67)).toBeLessThan(await topOf(48));
+
+  // A sharp is written on its letter's line, so F♯4 sits below the G above it.
+  await play(page, [0x90, 66, 100]);
+  expect(await topOf(66)).toBeGreaterThan(await topOf(67));
+
+  await play(page, [0x80, 67, 0]);
+  await play(page, [0x80, 66, 0]);
+  await expect(bar(67)).toHaveCount(0);
+  await expect(bar(48)).toBeVisible(); // still held
+
+  // Switching the aid off takes the bars away even with keys still down.
+  await page.getByLabel('Show what I play').uncheck();
+  await expect(page.locator('.held-note')).toHaveCount(0);
 });
 
 /**

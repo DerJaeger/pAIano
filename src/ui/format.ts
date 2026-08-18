@@ -1,8 +1,8 @@
-const NAMES = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
+import { pitchClassName } from '../core/notation/pitch';
 
 /** Scientific pitch notation, e.g. 60 → "C4". Enharmonics are not key-aware. */
 export function noteName(midiNote: number): string {
-  return `${NAMES[((midiNote % 12) + 12) % 12]!}${String(Math.floor(midiNote / 12) - 1)}`;
+  return `${pitchClassName(midiNote)}${String(Math.floor(midiNote / 12) - 1)}`;
 }
 
 export function formatDuration(seconds: number): string {

@@ -30,10 +30,19 @@ export function measureIndexAt(score: Score, tick: number): number | undefined {
 
 /** Every distinct note written in a measure, whatever pass it was played on. */
 export function notesInMeasure(score: Score, measureIndex: number): NoteRef[] {
+  return distinctNotes(score, (event) => event.measureIndex === measureIndex);
+}
+
+/** Every distinct note on the page — each written note once, repeats included. */
+export function allNoteRefs(score: Score): NoteRef[] {
+  return distinctNotes(score, () => true);
+}
+
+function distinctNotes(score: Score, keep: (event: NoteEvent) => boolean): NoteRef[] {
   const seen = new Set<string>();
   const refs: NoteRef[] = [];
   for (const event of score.events) {
-    if (event.measureIndex !== measureIndex) continue;
+    if (!keep(event)) continue;
     const ref = noteRefOf(score, event);
     const key = noteRefKey(ref);
     if (seen.has(key)) continue;

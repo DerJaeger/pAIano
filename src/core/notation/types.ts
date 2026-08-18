@@ -48,6 +48,14 @@ export interface NotationPort {
    * caller's intent restorable after a re-render (zoom, resize).
    */
   highlight(notes: readonly NoteHighlight[]): void;
+  /** Writes each note's name on its notehead, for a reader still learning them. */
+  setNoteLabels(show: boolean): void;
+  /**
+   * Draws the keys held down right now as bars across the staff at their own
+   * pitch, wherever the playhead stands. Replaces the whole set, like
+   * `highlight`; an empty list means hands off the keyboard.
+   */
+  showHeldNotes(midiNotes: readonly number[]): void;
   setZoom(zoom: number): void;
   destroy(): void;
 }

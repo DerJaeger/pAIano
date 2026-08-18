@@ -1,46 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
-
-/**
- * Web MIDI needs hardware and a permission prompt, so we install a stub before
- * the page loads and play it from the test. This exercises the real adapter and
- * the real UI — only the keyboard is fake.
- */
-async function stubMidiKeyboard(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const input = {
-      id: 'stub-1',
-      name: 'Stub Piano',
-      manufacturer: 'Playwright',
-      state: 'connected',
-      onmidimessage: null as ((event: { data: Uint8Array; timeStamp: number }) => void) | null,
-    };
-    const access = {
-      inputs: new Map([[input.id, input]]),
-      outputs: new Map(),
-      onstatechange: null,
-    };
-
-    Object.defineProperty(navigator, 'requestMIDIAccess', {
-      configurable: true,
-      value: () => Promise.resolve(access),
-    });
-
-    Object.defineProperty(window, 'midiStub', {
-      configurable: true,
-      value: {
-        send(bytes: number[]) {
-          input.onmidimessage?.({ data: new Uint8Array(bytes), timeStamp: performance.now() });
-        },
-      },
-    });
-  });
-}
-
-const play = (page: Page, bytes: number[]) =>
-  page.evaluate(
-    (data) => (window as unknown as { midiStub: { send(b: number[]): void } }).midiStub.send(data),
-    bytes,
-  );
+import { expect, test } from '@playwright/test';
+import { play, stubMidiKeyboard } from './midiStub';
 
 test('shows the notes you play on a connected MIDI keyboard', async ({ page }) => {
   await stubMidiKeyboard(page);

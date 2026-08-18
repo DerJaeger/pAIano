@@ -263,6 +263,26 @@ th {
   text-align: right;
 }
 
+/* Reading aids: on the same row, off to one side of the bar controls. */
+.sheet-options {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border: 0;
+  padding: 0;
+  margin: 0 0 0.6rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.sheet-options label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 /* Sheet music is engraved in black: it keeps its own paper, light or dark. */
 .sheet {
   position: relative;
@@ -289,6 +309,36 @@ th {
   background: var(--accent);
   opacity: 0.75;
   pointer-events: none;
+}
+
+/* Names written on the noteheads, and the keys you are holding — both are
+   drawn over the engraving in page coordinates by the notation adapter. */
+.note-labels,
+.held-notes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.note-label {
+  position: absolute;
+  /* The adapter gives the centre of the notehead; sit the name on top of it. */
+  transform: translate(-50%, -50%);
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  /* Legible on a filled notehead and on the white inside a hollow one. */
+  paint-order: stroke;
+  -webkit-text-stroke: 0.25em #1b1a18;
+  white-space: nowrap;
+}
+
+/* A key you are holding down, at its own pitch: a bar laid over the staff. */
+.held-note {
+  position: absolute;
+  border-radius: 999px;
+  background: var(--accent);
+  opacity: 0.6;
 }
 
 .visually-hidden {

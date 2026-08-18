@@ -10,6 +10,8 @@ export class FakeNotation implements NotationPort {
   cursor: WrittenPosition | undefined;
   visibleSystems: number | undefined;
   highlights: readonly NoteHighlight[] = [];
+  noteLabels = false;
+  heldNotes: readonly number[] = [];
   zoom = 1;
   destroyed = false;
   /** Set to make `load` reject, for the error path. */
@@ -31,6 +33,14 @@ export class FakeNotation implements NotationPort {
 
   highlight(notes: readonly NoteHighlight[]): void {
     this.highlights = notes;
+  }
+
+  setNoteLabels(show: boolean): void {
+    this.noteLabels = show;
+  }
+
+  showHeldNotes(midiNotes: readonly number[]): void {
+    this.heldNotes = midiNotes;
   }
 
   setZoom(zoom: number): void {

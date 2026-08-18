@@ -38,6 +38,14 @@ notes you are expected to play are the ones you muted the guide out of, so there
 setting to keep in step. See [ADR-0005](docs/adr/0005-practice-engine.md) for why the timing
 window is measured in ticks rather than milliseconds.
 
+Three switches above the sheet help while you are still learning to read it: **note
+names** written on the noteheads, **colour by pitch** (a Boomwhacker-style colour per
+pitch class, so a phrase reads as a pattern before it reads as positions on a staff),
+and **show what I play** — every key you are holding drawn as a bar across the staff
+at its own pitch, wherever the playhead stands, right note or not. See
+[ADR-0006](docs/adr/0006-reading-aids.md) for how a pitch nothing in the piece plays
+still finds its line.
+
 The guide needs an instrument that accepts incoming MIDI, and most keyboards want their
 &ldquo;local control off&rdquo; setting so the guide does not fight your own playing.
 
@@ -68,7 +76,7 @@ src/
     score/       Score model, tempo map, .mxl container
       musicxml/  parser, repeat expansion, fixture corpus
     midi/        message decoding, keyboard state, input + output ports + fakes
-    notation/    notation port + fake, written ↔ expanded positions
+    notation/    notation port + fake, written ↔ expanded positions, page geometry
     transport/   clock, tick ↔ time timeline, lookahead scheduler
     practice/    what you owe, what you played, how it scored
   adapters/

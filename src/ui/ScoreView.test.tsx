@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { ScoreView } from './ScoreView';
+import { pitchColor } from './noteColors';
+import { FakeMidiInput } from '../core/midi/fakeMidiInput';
 import { FakeNotation } from '../core/notation/fakeNotation';
 import { parseMusicXml } from '../core/score/musicxml/parseMusicXml';
 import { attributes, note, score as scoreXml } from '../core/score/musicxml/fixtures';
@@ -121,6 +123,78 @@ describe('ScoreView', () => {
     await user.click(screen.getByRole('button', { name: 'Zoom out' }));
     await waitFor(() => {
       expect(notation.zoom).toBe(1);
+    });
+  });
+
+  it('writes the note names on the sheet on request', async () => {
+    const { notation, user } = await show();
+    expect(notation.noteLabels).toBe(false);
+
+    await user.click(screen.getByLabelText('Note names'));
+    await waitFor(() => {
+      expect(notation.noteLabels).toBe(true);
+    });
+
+    await user.click(screen.getByLabelText('Note names'));
+    await waitFor(() => {
+      expect(notation.noteLabels).toBe(false);
+    });
+  });
+
+  it('colours every note by pitch instead of highlighting the bar', async () => {
+    const { notation, user } = await show();
+
+    await user.click(screen.getByLabelText('Colour by pitch'));
+    await waitFor(() => {
+      // Every note on the page, rather than the four in the bar the cursor is
+      // on — and no bar highlight left over on top of them.
+      expect(notation.highlights).toHaveLength(6);
+    });
+    expect(notation.highlights.map((highlight) => highlight.color)).toEqual(
+      [60, 62, 64, 65, 67, 69].map(pitchColor),
+    );
+
+    await user.click(screen.getByLabelText('Colour by pitch'));
+    await waitFor(() => {
+      expect(notation.highlights).toHaveLength(4);
+    });
+  });
+
+  it('shows the keys you are holding, until you ask it not to', async () => {
+    const input = new FakeMidiInput();
+    const notation = new FakeNotation();
+    render(
+      <ScoreView
+        score={score}
+        musicXml={musicXml}
+        position={{ measureIndex: 0, tickInMeasure: 0, pass: 0 }}
+        input={input}
+        onSeekBar={() => undefined}
+        createNotation={() => Promise.resolve(notation)}
+      />,
+    );
+    await waitFor(() => {
+      expect(notation.loaded).toBe(musicXml);
+    });
+
+    act(() => {
+      input.chord([60, 64]);
+    });
+    await waitFor(() => {
+      expect(notation.heldNotes).toEqual([60, 64]);
+    });
+
+    act(() => {
+      input.release(60);
+    });
+    await waitFor(() => {
+      expect(notation.heldNotes).toEqual([64]);
+    });
+
+    // Off means off, even with a key still down.
+    await userEvent.click(screen.getByLabelText('Show what I play'));
+    await waitFor(() => {
+      expect(notation.heldNotes).toEqual([]);
     });
   });
 
