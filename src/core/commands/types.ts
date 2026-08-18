@@ -58,13 +58,15 @@ export const COMMAND_LABELS: Record<Command, string> = {
 };
 
 /**
- * What a command acts on. The transport and score cover almost everything;
- * `showHelp` is the one command with nowhere in core to land, so the UI passes
- * a handler for it and core tests need none.
+ * What a command acts on.
+ *
+ * Score and transport are optional because the commands that reach the library
+ * and the cheat sheet have to work when nothing is open yet — that is precisely
+ * when you want to find a piece. Commands that do need them are no-ops without.
  */
 export interface CommandContext {
-  score: Score;
-  transport: Transport;
+  score?: Score | undefined;
+  transport?: Transport | undefined;
   onShowHelp?: () => void;
   /** Opens or closes the library overlay. */
   onFindSong?: () => void;

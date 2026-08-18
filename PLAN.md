@@ -246,6 +246,15 @@ already have in their fingers. `ctrl+p` was tried first and rejected: it is the 
 and a shortcut you have to wrestle away from the browser is the wrong kind of familiar, so the
 no-ctrl rule in ADR-0007 stands unbroken.
 
+Two bugs found in use afterwards are worth keeping in mind, because both were shaped by *ordering*
+rather than by logic. Shortcuts were gated behind "a score is open and a transport exists", which
+made the command that opens the library unavailable in exactly the state you press it in — so
+`CommandContext` now has an optional score and transport, and only the commands that need them are
+gated. And restoring the stored directory handle was a separate call the caller had to make first,
+which raced the permission check that ran during the same mount: `checkAccess` answered from a
+handle nobody had read yet, so a reload was indistinguishable from a revoked permission. The
+adapter now loads the handle lazily and everything awaits it, so the ordering cannot be got wrong.
+
 Two counting bugs were fixed at the same time: `playCount` incremented on every *open*, so clicking
 a piece to look at it made it your most played. Opening and playing are now separate, and a play is
 counted once per session in which the transport actually ran. And the last opened piece is

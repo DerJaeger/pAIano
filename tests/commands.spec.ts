@@ -123,6 +123,19 @@ test('counts a play only when the music actually runs', async ({ page }) => {
   await expect(palette.getByText(/played 1×/)).toBeVisible();
 });
 
+test('opens the library on alt+p before anything is open at all', async ({ page }) => {
+  // The case that matters: you press it *because* nothing is open. Shortcuts
+  // used to need a score and a transport, so this did nothing.
+  await stubMidiKeyboard(page, { withOutput: true });
+  await stubMusicFolder(page, { 'four-bars.musicxml': musicXml });
+  await page.goto('/');
+  await page.getByRole('heading', { name: 'Web PianoBooster' }).click();
+
+  await page.keyboard.press('Alt+p');
+
+  await expect(page.getByRole('dialog', { name: 'Library' })).toBeVisible();
+});
+
 test('opens the library on alt+p, leaving the browser its own shortcuts', async ({ page }) => {
   await openAndConnect(page);
 

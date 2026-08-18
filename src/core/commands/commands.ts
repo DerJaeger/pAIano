@@ -1,6 +1,8 @@
 import { measureIndexAt } from '../notation/position';
 import { tracksOf } from '../score/tracks';
 import { fasterThan, slowerThan } from '../transport/speeds';
+import type { Score } from '../score/types';
+import type { Transport } from '../transport/transport';
 import type { Command, CommandContext } from './types';
 
 /**
@@ -12,7 +14,20 @@ import type { Command, CommandContext } from './types';
  * know the command was inapplicable and no interest in being told.
  */
 export function runCommand(command: Command, context: CommandContext): void {
+  // The two that reach the UI rather than the music. They come first because
+  // they must work with nothing open — which is exactly when you reach for the
+  // library — and so must not sit behind the transport guard below.
+  if (command === 'findSong') {
+    context.onFindSong?.();
+    return;
+  }
+  if (command === 'showHelp') {
+    context.onShowHelp?.();
+    return;
+  }
+
   const { transport, score } = context;
+  if (!transport || !score) return;
 
   switch (command) {
     case 'playPause':
@@ -31,21 +46,21 @@ export function runCommand(command: Command, context: CommandContext): void {
       return;
 
     case 'restartBar':
-      transport.seekMeasure(currentBar(context));
+      transport.seekMeasure(currentBar(score, transport));
       return;
 
     case 'previousBar':
-      transport.seekMeasure(Math.max(0, currentBar(context) - 1));
+      transport.seekMeasure(Math.max(0, currentBar(score, transport) - 1));
       return;
 
     case 'nextBar':
-      transport.seekMeasure(Math.min(score.measures.length - 1, currentBar(context) + 1));
+      transport.seekMeasure(Math.min(score.measures.length - 1, currentBar(score, transport) + 1));
       return;
 
     case 'repeatBar': {
       if (transport.getLoop()) transport.setLoop(undefined);
       else {
-        const bar = currentBar(context);
+        const bar = currentBar(score, transport);
         transport.setLoopMeasures(bar, bar);
       }
       return;
@@ -64,21 +79,13 @@ export function runCommand(command: Command, context: CommandContext): void {
       return;
 
     case 'cycleHands':
-      cycleHands(context);
-      return;
-
-    case 'findSong':
-      context.onFindSong?.();
-      return;
-
-    case 'showHelp':
-      context.onShowHelp?.();
+      cycleHands(score, transport);
       return;
   }
 }
 
 /** The written bar the playhead is in; the last one once the piece has run out. */
-function currentBar({ score, transport }: CommandContext): number {
+function currentBar(score: Score, transport: Transport): number {
   return measureIndexAt(score, transport.getPositionTick()) ?? score.measures.length - 1;
 }
 
@@ -89,7 +96,7 @@ function currentBar({ score, transport }: CommandContext): number {
  * hand" to hear, and muting the only one would leave the command looking
  * broken. More than two and the checkboxes are the honest interface.
  */
-function cycleHands({ score, transport }: CommandContext): void {
+function cycleHands(score: Score, transport: Transport): void {
   const tracks = tracksOf(score);
   if (tracks.length !== 2) return;
 

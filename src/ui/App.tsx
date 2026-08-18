@@ -61,10 +61,6 @@ export function App({
   // The overlay owns the keyboard while it is up, so shortcuts stand down.
   const [libraryOpen, setLibraryOpen] = useState(false);
 
-  useEffect(() => {
-    if (port instanceof FileSystemLibrary) void port.restore();
-  }, [port]);
-
   // Pick up where you left off. It waits for the folder to be readable, which
   // on a cold start means after the one Reconnect click — the file simply
   // cannot be read before then, so there is nothing to do earlier.
@@ -104,20 +100,20 @@ export function App({
   }, []);
   // Commands need a transport to drive, so there is nothing to dispatch into
   // until a score is open and an instrument is connected.
+  // Always present. The library and cheat-sheet commands have to work before
+  // anything is open — that is when you reach for them — and the rest are
+  // no-ops without a score, which `runCommand` handles.
   const commandContext = useMemo(
-    () =>
-      opened && transport
-        ? {
-            score: opened.score,
-            transport,
-            onShowHelp: () => {
-              setHelpOpen((open) => !open);
-            },
-            onFindSong: () => {
-              setLibraryOpen((open) => !open);
-            },
-          }
-        : undefined,
+    () => ({
+      score: opened?.score,
+      transport,
+      onShowHelp: () => {
+        setHelpOpen((open) => !open);
+      },
+      onFindSong: () => {
+        setLibraryOpen((open) => !open);
+      },
+    }),
     [opened, transport],
   );
   useCommands(commandContext, midi.input, bindings, !helpOpen && !libraryOpen);

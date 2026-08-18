@@ -23,12 +23,25 @@ export function supportsFileSystemAccess(): boolean {
 
 export class FileSystemLibrary implements LibraryPort {
   private root: FileSystemDirectoryHandle | undefined;
+  /** Started once, awaited by everything. See `loaded()`. */
+  private loading: Promise<void> | undefined;
 
-  /** Re-opens the stored handle. Call once at startup, before anything else. */
-  async restore(): Promise<AccessState> {
-    if (!supportsFileSystemAccess()) return 'unsupported';
-    this.root = await idbGet<FileSystemDirectoryHandle>(HANDLE_KEY);
-    return this.checkAccess();
+  /**
+   * Reads the stored handle back, once, and makes every other method wait for
+   * it.
+   *
+   * Lazily rather than from a startup call on purpose. When restoring was the
+   * caller's job, `checkAccess()` could run first and answer `prompt` from a
+   * handle that simply had not been read yet — so a reload looked exactly like
+   * a revoked permission, and the library came back empty. Ordering that
+   * subtle should not be something a caller can get wrong.
+   */
+  private loaded(): Promise<void> {
+    this.loading ??= (async () => {
+      if (!supportsFileSystemAccess()) return;
+      this.root = await idbGet<FileSystemDirectoryHandle>(HANDLE_KEY).catch(() => undefined);
+    })();
+    return this.loading;
   }
 
   getRootName(): string | undefined {
@@ -37,12 +50,14 @@ export class FileSystemLibrary implements LibraryPort {
 
   async checkAccess(): Promise<AccessState> {
     if (!supportsFileSystemAccess()) return 'unsupported';
+    await this.loaded();
     if (!this.root) return 'prompt';
     // queryPermission never prompts, which is what makes it safe on load.
     return await this.root.queryPermission({ mode: 'read' });
   }
 
   async requestAccess(): Promise<AccessState> {
+    await this.loaded();
     if (!this.root) return 'prompt';
     return await this.root.requestPermission({ mode: 'read' });
   }
@@ -58,6 +73,7 @@ export class FileSystemLibrary implements LibraryPort {
   }
 
   async scan(): Promise<ScannedFile[]> {
+    await this.loaded();
     if (!this.root) throw notAllowed();
     const files: ScannedFile[] = [];
     await walk(this.root, '', files, 0);
@@ -65,6 +81,7 @@ export class FileSystemLibrary implements LibraryPort {
   }
 
   async read(path: string): Promise<Uint8Array> {
+    await this.loaded();
     if (!this.root) throw notAllowed();
     const segments = path.split('/');
     const fileName = segments.pop();
@@ -79,6 +96,7 @@ export class FileSystemLibrary implements LibraryPort {
   }
 
   async forget(): Promise<void> {
+    await this.loaded();
     this.root = undefined;
     await idbDelete(HANDLE_KEY);
   }

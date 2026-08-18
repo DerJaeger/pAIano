@@ -190,6 +190,32 @@ describe('runCommand, the rest of the panel', () => {
     expect(onShowHelp).toHaveBeenCalledOnce();
   });
 
+  it('finds a piece with nothing open at all', () => {
+    // The whole point: you press it *because* nothing is open. A context with
+    // no score must still reach the library.
+    const onFindSong = vi.fn();
+
+    runCommand('findSong', { onFindSong });
+
+    expect(onFindSong).toHaveBeenCalledOnce();
+  });
+
+  it('shows the cheat sheet with nothing open', () => {
+    const onShowHelp = vi.fn();
+
+    runCommand('showHelp', { onShowHelp });
+
+    expect(onShowHelp).toHaveBeenCalledOnce();
+  });
+
+  it('shrugs off a transport command when there is no transport', () => {
+    expect(() => {
+      runCommand('playPause', {});
+      runCommand('nextBar', {});
+      runCommand('cycleHands', {});
+    }).not.toThrow();
+  });
+
   it('does nothing for a command the surface cannot handle', () => {
     const ctx = context();
 
