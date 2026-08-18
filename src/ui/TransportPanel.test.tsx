@@ -13,7 +13,6 @@ import {
 import { parseMusicXml } from '../core/score/musicxml/parseMusicXml';
 import { FakeClock } from '../core/transport/clock';
 import { Transport } from '../core/transport/transport';
-import { readSetting } from './settings';
 import { TransportPanel } from './TransportPanel';
 
 const musicXml = scoreXml([
@@ -124,14 +123,6 @@ describe('TransportPanel', () => {
     // The point of the switch: the instrument stays connected, so flipping back
     // is instant rather than a trip through the device picker.
     expect(output.getSelectedDeviceId()).toBe(device);
-  });
-
-  it('remembers the guide switch across a reload', async () => {
-    const { user } = show();
-
-    await user.click(screen.getByRole('checkbox', { name: /Send guide to MIDI out/i }));
-
-    expect(readSetting('guideAudible', true)).toBe(false);
   });
 
   it('shows the switch as the transport has it', () => {

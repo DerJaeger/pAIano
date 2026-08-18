@@ -233,7 +233,7 @@ keyboard, every interaction still costs a trip to the mouse and a dialog.
 - **Done when:** point it at your MuseScore folder once, and on every later startup your library is
   just there and any piece is three keystrokes away.
 
-#### 6b — Keyboard and pedal commands
+#### 6b — Keyboard and pedal commands ✅
 Practising means your hands are on the keys, so the transport has to be reachable without them
 leaving. Two input surfaces, one command layer.
 
@@ -255,6 +255,15 @@ leaving. Two input surfaces, one command layer.
 - Supersedes ideas 1 in [IDEAS.md](IDEAS.md).
 - **Done when:** you can find, start, loop and restart a piece without touching the mouse — and
   restart the bar you just fluffed without lifting your hands off the keys at all.
+
+Landed, minus `find song` and `toggle sidebar`, which have nothing to act on until 6a builds them.
+Decisions are in [ADR-0007](docs/adr/0007-command-layer.md). The pedal vocabulary settled on **two
+quick taps to restart the bar, three to restart the piece**, with a single tap deliberately
+meaningless: it is the most natural gesture and so the one ordinary pedalling produces constantly.
+And the guard against a command firing when it should not is a switch the owning component throws
+(`useCommands(..., enabled)`), not focus-guessing — which was tried first and got it wrong in
+exactly the case that matters, where the key press assigning a binding also ran the command it had
+just been given. The fuzzy finder in 6a should use the same switch.
 
 #### 6c — Guide output toggle ✅
 - **One checkbox: "Send guide to MIDI out."** Off = practice (silent guide, you are the sound),
@@ -333,8 +342,8 @@ controlling it without leaving the keyboard. That is Phase 6.
 
 1. ~~**6c** — the guide-output checkbox.~~ Done: it gates the sends, not the connection, and
    established the "command, not a device reconnection" shape that 6b builds on.
-2. **6b** — the `Command` layer, keyboard bindings, then the MIDI gesture recognizer test-first.
-   `toggle MIDI output` is already a method on `Transport` waiting for a binding.
+2. ~~**6b** — the `Command` layer, keyboard bindings, then the MIDI gesture recognizer.~~ Done.
+   `findSong` and `toggleSidebar` join the `Command` union as 6a builds something for them to do.
 3. **6a** — the library: persisted root handle and recursive index, then the pure fuzzy ranker and
    recent/favourites/most-played ordering, then the sidebar UI on top of them.
 

@@ -2,12 +2,11 @@ import type { MidiOutputPort } from '../core/midi/output';
 import { tracksOf } from '../core/score/tracks';
 import type { Score } from '../core/score/types';
 import type { Transport } from '../core/transport/transport';
+import { SPEEDS } from '../core/transport/speeds';
 import { measureIndexAt } from '../core/notation/position';
-import { writeSetting } from './settings';
 import { useMidiDevices } from './useMidi';
 import { useTransportState } from './useTransport';
 
-const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5] as const;
 const COUNT_IN_BEATS = 4;
 
 /**
@@ -174,7 +173,6 @@ export function TransportPanel({
               checked={guideAudible}
               onChange={(event) => {
                 transport.setGuideAudible(event.target.checked);
-                writeSetting('guideAudible', event.target.checked);
               }}
             />
             Send guide to MIDI out

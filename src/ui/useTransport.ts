@@ -3,7 +3,7 @@ import type { MidiOutputPort } from '../core/midi/output';
 import type { Score } from '../core/score/types';
 import { performanceClock, type Clock } from '../core/transport/clock';
 import { Transport } from '../core/transport/transport';
-import { readSetting } from './settings';
+import { readSetting, writeSetting } from './settings';
 
 /**
  * How often the scheduler is asked to refill its lookahead window. Well under
@@ -46,8 +46,19 @@ export function useTransport(
       engine.tick();
     }, TICK_MS);
 
+    // Persisting from the transport rather than from the checkbox means the
+    // keyboard shortcut and the pedal gesture are remembered too, without each
+    // surface having to remember to save.
+    let saved = engine.isGuideAudible();
+    const unsubscribe = engine.onChange(() => {
+      if (engine.isGuideAudible() === saved) return;
+      saved = engine.isGuideAudible();
+      writeSetting('guideAudible', saved);
+    });
+
     return () => {
       clearInterval(ticker);
+      unsubscribe();
       engine.close();
     };
   }, [score, output, clock]);

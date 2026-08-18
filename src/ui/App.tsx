@@ -1,17 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { writtenPositionAt } from '../core/notation/position';
 import type { WrittenPosition } from '../core/notation/types';
 import { readMusicXmlSource } from '../core/score/mxl';
 import { parseMusicXml } from '../core/score/musicxml/parseMusicXml';
 import type { Score } from '../core/score/types';
+import { DEFAULT_BINDINGS, type Bindings } from '../core/commands/bindings';
 import { feedbackHighlights } from './feedback';
 import { MidiPanel } from './MidiPanel';
 import { PracticePanel } from './PracticePanel';
 import { ScoreSummary } from './ScoreSummary';
 import { ScoreView } from './ScoreView';
+import { ShortcutHelp } from './ShortcutHelp';
 import { TransportPanel } from './TransportPanel';
 import { openWebMidi } from '../adapters/midi/webMidiAdapter';
 import { useMidi, type OpenMidi } from './useMidi';
+import { readSetting, writeSetting } from './settings';
+import { useCommands } from './useCommands';
 import { usePractice, usePracticeState } from './usePractice';
 import { useTransport, useTransportPosition } from './useTransport';
 
@@ -42,6 +46,32 @@ export function App({ open = openWebMidi }: { open?: OpenMidi } = {}) {
   // Without an instrument there is no transport, but the score is still worth
   // reading, so browsing bars keeps working on its own.
   const [browsedBar, setBrowsedBar] = useState(0);
+
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [bindings, setBindings] = useState<Bindings>(() =>
+    readSetting('bindings', DEFAULT_BINDINGS),
+  );
+  const rebind = useCallback((next: Bindings) => {
+    setBindings(next);
+    writeSetting('bindings', next);
+  }, []);
+  // Commands need a transport to drive, so there is nothing to dispatch into
+  // until a score is open and an instrument is connected.
+  const commandContext = useMemo(
+    () =>
+      opened && transport
+        ? {
+            score: opened.score,
+            transport,
+            onShowHelp: () => {
+              setHelpOpen((open) => !open);
+            },
+          }
+        : undefined,
+    [opened, transport],
+  );
+  useCommands(commandContext, midi.input, bindings, !helpOpen);
+
   const played = opened && transport ? writtenPositionAt(opened.score, positionTick) : undefined;
   const lastBar = opened ? opened.score.measures.length - 1 : 0;
   const position: WrittenPosition = played ?? {
@@ -137,6 +167,16 @@ export function App({ open = openWebMidi }: { open?: OpenMidi } = {}) {
           />
           <ScoreSummary score={opened.score} />
         </>
+      )}
+
+      {helpOpen && (
+        <ShortcutHelp
+          bindings={bindings}
+          onRebind={rebind}
+          onClose={() => {
+            setHelpOpen(false);
+          }}
+        />
       )}
     </main>
   );

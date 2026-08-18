@@ -53,6 +53,14 @@ and the instrument stays selected either way. The count-in click is not gated by
 it is a metronome, and it is how you know when to come in. The setting is remembered
 between sessions.
 
+Nothing needs the mouse. Space plays and pauses, the arrows step bars and tempo, and
+`?` shows the rest — click any key in that list to move it somewhere you will
+remember. Two quick taps of the **sustain pedal** restart the bar and three restart
+the piece, recognised only with no note held down, so a gesture can never be mistaken
+for playing. Both surfaces run the same commands; see
+[ADR-0007](docs/adr/0007-command-layer.md) for why the pedal refuses to answer to a
+single tap.
+
 The guide needs an instrument that accepts incoming MIDI, and most keyboards want their
 &ldquo;local control off&rdquo; setting so the guide does not fight your own playing.
 
@@ -83,6 +91,7 @@ src/
     score/       Score model, tempo map, .mxl container
       musicxml/  parser, repeat expansion, fixture corpus
     midi/        message decoding, keyboard state, input + output ports + fakes
+    commands/    what the app can be told to do, and the two ways to say it
     notation/    notation port + fake, written ↔ expanded positions, page geometry
     transport/   clock, tick ↔ time timeline, lookahead scheduler
     practice/    what you owe, what you played, how it scored
