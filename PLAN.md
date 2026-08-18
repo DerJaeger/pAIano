@@ -347,7 +347,22 @@ controlling it without leaving the keyboard. That is Phase 6.
 3. **6a** — the library: persisted root handle and recursive index, then the pure fuzzy ranker and
    recent/favourites/most-played ordering, then the sidebar UI on top of them.
 
-One thing to settle before 6a: whether the persisted directory handle survives a browser restart
-cleanly enough on Chromium to make "your library is just there" true, or whether the permission
-re-prompt makes it a one-click-per-session promise instead. Worth a ten-minute check, because the
-answer changes what the sidebar shows on a cold start.
+**Settled (Chrome 151, Linux, 2026-08-18) — measured, not assumed.** A throwaway probe picked a
+music folder, stored the handle in IndexedDB and indexed 84 scores, and Chrome was then fully
+restarted:
+
+- the **handle itself survives** a restart — so the folder is never re-picked, only re-authorised;
+- **our own index is readable with no permission at all**, because it is our data in our IndexedDB;
+- **permission comes back as `prompt`**, not `granted`, and `requestPermission()` needs a user
+  gesture, so it cannot be restored silently on load;
+- `requestPermission()` shows a **plain Allow bubble** naming the folder — not the directory
+  picker — and returns `granted`;
+- reading *before* asking throws **`NotAllowedError`**, rather than returning nothing. That is the
+  signal the library layer catches and turns into the Reconnect prompt, so a stale permission can
+  never look like an empty folder.
+
+So "your library is just there" is true of everything except opening a file. The sidebar renders
+the full library from the index on a cold start — browsing, search, favourites and most-played all
+work with no permission — and carries a single **Reconnect folder** button that opening a score
+also triggers if it has not been pressed yet. One click per browser session, and never a directory
+picker again. This is what 6a builds; it is not a fallback path.
