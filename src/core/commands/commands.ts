@@ -67,6 +67,14 @@ export function runCommand(command: Command, context: CommandContext): void {
       cycleHands(context);
       return;
 
+    case 'findSong':
+      context.onFindSong?.();
+      return;
+
+    case 'toggleSidebar':
+      context.onToggleSidebar?.();
+      return;
+
     case 'showHelp':
       context.onShowHelp?.();
       return;

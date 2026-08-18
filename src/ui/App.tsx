@@ -1,10 +1,13 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { writtenPositionAt } from '../core/notation/position';
 import type { WrittenPosition } from '../core/notation/types';
 import { readMusicXmlSource } from '../core/score/mxl';
 import { parseMusicXml } from '../core/score/musicxml/parseMusicXml';
 import type { Score } from '../core/score/types';
 import { DEFAULT_BINDINGS, type Bindings } from '../core/commands/bindings';
+import { FileSystemLibrary } from '../adapters/library/fileSystemLibrary';
+import { LibrarySidebar } from './LibrarySidebar';
+import { useLibrary } from './useLibrary';
 import { feedbackHighlights } from './feedback';
 import { MidiPanel } from './MidiPanel';
 import { PracticePanel } from './PracticePanel';
@@ -47,6 +50,21 @@ export function App({ open = openWebMidi }: { open?: OpenMidi } = {}) {
   // reading, so browsing bars keeps working on its own.
   const [browsedBar, setBrowsedBar] = useState(0);
 
+  // One port for the life of the app; `restore` re-opens the stored handle.
+  const port = useMemo(() => new FileSystemLibrary(), []);
+  const library = useLibrary(port);
+  const [openPath, setOpenPath] = useState<string | undefined>(undefined);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    readSetting('sidebarCollapsed', false),
+  );
+  const searchRef = useRef<HTMLInputElement>(null);
+  // While the finder has the keyboard, a letter is a search term, not a command.
+  const [finderFocused, setFinderFocused] = useState(false);
+
+  useEffect(() => {
+    void port.restore();
+  }, [port]);
+
   const [helpOpen, setHelpOpen] = useState(false);
   const [bindings, setBindings] = useState<Bindings>(() =>
     readSetting('bindings', DEFAULT_BINDINGS),
@@ -66,11 +84,22 @@ export function App({ open = openWebMidi }: { open?: OpenMidi } = {}) {
             onShowHelp: () => {
               setHelpOpen((open) => !open);
             },
+            onFindSong: () => {
+              setSidebarCollapsed(false);
+              // After the render that un-collapses it, or there is no input yet.
+              requestAnimationFrame(() => searchRef.current?.focus());
+            },
+            onToggleSidebar: () => {
+              setSidebarCollapsed((collapsed) => {
+                writeSetting('sidebarCollapsed', !collapsed);
+                return !collapsed;
+              });
+            },
           }
         : undefined,
     [opened, transport],
   );
-  useCommands(commandContext, midi.input, bindings, !helpOpen);
+  useCommands(commandContext, midi.input, bindings, !helpOpen && !finderFocused);
 
   const played = opened && transport ? writtenPositionAt(opened.score, positionTick) : undefined;
   const lastBar = opened ? opened.score.measures.length - 1 : 0;
@@ -85,12 +114,11 @@ export function App({ open = openWebMidi }: { open?: OpenMidi } = {}) {
     transport?.seekMeasure(measureIndex);
   }
 
-  async function openFile(file: File): Promise<void> {
+  function openBytes(bytes: Uint8Array, name: string): void {
     setError(undefined);
-    setFileName(file.name);
+    setFileName(name);
     setBrowsedBar(0);
     try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
       const musicXml = readMusicXmlSource(bytes);
       setOpened({ score: parseMusicXml(musicXml), musicXml });
     } catch (cause) {
@@ -99,8 +127,21 @@ export function App({ open = openWebMidi }: { open?: OpenMidi } = {}) {
     }
   }
 
+  async function openFile(file: File): Promise<void> {
+    openBytes(new Uint8Array(await file.arrayBuffer()), file.name);
+  }
+
+  /** Opening from the library also records it, which feeds Recent and Most played. */
+  async function openFromLibrary(path: string): Promise<void> {
+    const bytes = await library.open(path);
+    if (bytes) {
+      setOpenPath(path);
+      openBytes(bytes, path);
+    }
+  }
+
   return (
-    <main className="app">
+    <main className={`app with-library${sidebarCollapsed ? ' rail' : ''}`}>
       <header>
         <h1>Web PianoBooster</h1>
         <p className="tagline">
@@ -109,65 +150,84 @@ export function App({ open = openWebMidi }: { open?: OpenMidi } = {}) {
         </p>
       </header>
 
-      <MidiPanel connection={midi} />
-
-      <section
-        className="dropzone"
-        onDragOver={(event) => {
-          event.preventDefault();
+      <LibrarySidebar
+        library={library}
+        open={(path) => {
+          void openFromLibrary(path);
         }}
-        onDrop={(event) => {
-          event.preventDefault();
-          const file = event.dataTransfer.files[0];
-          if (file) void openFile(file);
+        onFocusChange={setFinderFocused}
+        openPath={openPath}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => {
+          setSidebarCollapsed((collapsed) => {
+            writeSetting('sidebarCollapsed', !collapsed);
+            return !collapsed;
+          });
         }}
-      >
-        <label className="button">
-          Open a score
-          <input
-            type="file"
-            accept=".musicxml,.xml,.mxl"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void openFile(file);
-            }}
-          />
-        </label>
-        <p>…or drop a MusicXML (.musicxml / .xml) or compressed MuseScore export (.mxl) here.</p>
-      </section>
+        searchRef={searchRef}
+      />
 
-      {error !== undefined && (
-        <p role="alert" className="error">
-          Could not read {fileName}: {error}
-        </p>
-      )}
+      <div className="app-main">
+        <MidiPanel connection={midi} />
 
-      {opened && (
-        <>
-          <TransportPanel
-            score={opened.score}
-            transport={transport}
-            output={midi.output}
-            positionTick={positionTick}
-          />
-          <PracticePanel
-            score={opened.score}
-            session={session}
-            practice={practice}
-            transport={transport}
-            onSeekBar={seekBar}
-          />
-          <ScoreView
-            score={opened.score}
-            musicXml={opened.musicXml}
-            position={position}
-            feedback={feedback}
-            input={midi.input}
-            onSeekBar={seekBar}
-          />
-          <ScoreSummary score={opened.score} />
-        </>
-      )}
+        <section
+          className="dropzone"
+          onDragOver={(event) => {
+            event.preventDefault();
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            const file = event.dataTransfer.files[0];
+            if (file) void openFile(file);
+          }}
+        >
+          <label className="button">
+            Open a score
+            <input
+              type="file"
+              accept=".musicxml,.xml,.mxl"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void openFile(file);
+              }}
+            />
+          </label>
+          <p>…or drop a MusicXML (.musicxml / .xml) or compressed MuseScore export (.mxl) here.</p>
+        </section>
+
+        {error !== undefined && (
+          <p role="alert" className="error">
+            Could not read {fileName}: {error}
+          </p>
+        )}
+
+        {opened && (
+          <>
+            <TransportPanel
+              score={opened.score}
+              transport={transport}
+              output={midi.output}
+              positionTick={positionTick}
+            />
+            <PracticePanel
+              score={opened.score}
+              session={session}
+              practice={practice}
+              transport={transport}
+              onSeekBar={seekBar}
+            />
+            <ScoreView
+              score={opened.score}
+              musicXml={opened.musicXml}
+              position={position}
+              feedback={feedback}
+              input={midi.input}
+              onSeekBar={seekBar}
+            />
+            <ScoreSummary score={opened.score} />
+          </>
+        )}
+      </div>
 
       {helpOpen && (
         <ShortcutHelp

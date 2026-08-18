@@ -53,6 +53,13 @@ and the instrument stays selected either way. The count-in click is not gated by
 it is a metronome, and it is how you know when to come in. The setting is remembered
 between sessions.
 
+Point the **library** at your music folder once and it is remembered: the sidebar indexes
+every score under it, however deeply nested, and finds any of them by subsequence —
+`bmin inv` reaches `Bach/Inventions/Invention 15 in B minor`. Chrome asks again each
+session before a page may read the folder, so there is one **Reconnect** click per
+session; the list, the search and your favourites all work before you make it, because
+the index is our own data rather than the folder's.
+
 Nothing needs the mouse. Space plays and pauses, the arrows step bars and tempo, and
 `?` shows the rest — click any key in that list to move it somewhere you will
 remember. Two quick taps of the **sustain pedal** restart the bar and three restart
@@ -92,10 +99,12 @@ src/
       musicxml/  parser, repeat expansion, fixture corpus
     midi/        message decoding, keyboard state, input + output ports + fakes
     commands/    what the app can be told to do, and the two ways to say it
+    library/     the index, the fuzzy ranker, and what you have played
     notation/    notation port + fake, written ↔ expanded positions, page geometry
     transport/   clock, tick ↔ time timeline, lookahead scheduler
     practice/    what you owe, what you played, how it scored
   adapters/
+    library/     File System Access + IndexedDB: the folder that is remembered
     midi/        Web MIDI → MidiInputPort / MidiOutputPort
     notation/    OpenSheetMusicDisplay → NotationPort
   ui/            React shell

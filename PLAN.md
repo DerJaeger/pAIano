@@ -203,12 +203,12 @@ skip the one you cannot get.
 Which notes are yours to play is not a new setting: they are exactly the ones the guide has been
 muted out of, so Phase 4's mute checkboxes do both jobs and cannot drift apart.
 
-### Phase 6 — Library, control, and the practice/listen switch ⬅ **in progress**
+### Phase 6 — Library, control, and the practice/listen switch ✅
 
 Three strands. They ship together because they are the same complaint: once you are sitting at the
 keyboard, every interaction still costs a trip to the mouse and a dialog.
 
-#### 6a — The library
+#### 6a — The library ✅
 - **One music root.** Pick a folder once (e.g. `/home/user/music`); it is scanned recursively for
   scores, however deeply nested. The directory handle is persisted in IndexedDB and re-opened on
   the next startup — a permission re-prompt on return is the only friction, and we ask for it
@@ -232,6 +232,17 @@ keyboard, every interaction still costs a trip to the mouse and a dialog.
   against a fake file tree — no browser API in a single one of those tests.
 - **Done when:** point it at your MuseScore folder once, and on every later startup your library is
   just there and any piece is three keystrokes away.
+
+Landed. The cold-start shape is the measured one recorded below: the catalog is cached separately
+from the directory handle, so the sidebar is full — searchable, starrable, ordered — before any
+permission exists, and only opening a file waits on the Reconnect click. `mergeScan` keeps the
+title and composer of any file whose size and date have not moved, so a rescan re-reads only what
+changed rather than re-opening 84 files for names that cannot have changed.
+
+**Not done, and deliberately deferred:** user-defined learning sets, user ordering of favourites,
+and `.mscz` via webmscore. The four sections and the finder are what make the library usable; sets
+are a second organising scheme on top of one that now works, and are better designed against real
+use of it.
 
 #### 6b — Keyboard and pedal commands ✅
 Practising means your hands are on the keys, so the transport has to be reachable without them
@@ -283,7 +294,7 @@ it is a metronome, not the guide, and it is how you know when to come in on a pa
 yourself. Persisting it brought the first `localStorage` setting into the app (`ui/settings.ts`),
 which 6b's binding map will reuse.
 
-### Phase 7 — PDF path (option 1 from the brief)
+### Phase 7 — PDF path (option 1 from the brief) ⬅ **next**
 - Pair a `.pdf` with a `.mid`, render pages with pdf.js, play the MIDI as the guide.
 - Position feedback limited to a **manually calibrated per-page/per-system marker** — be honest
   that note-level sync is not achievable from a PDF without OMR. This path is for scores where no
@@ -344,8 +355,9 @@ controlling it without leaving the keyboard. That is Phase 6.
    established the "command, not a device reconnection" shape that 6b builds on.
 2. ~~**6b** — the `Command` layer, keyboard bindings, then the MIDI gesture recognizer.~~ Done.
    `findSong` and `toggleSidebar` join the `Command` union as 6a builds something for them to do.
-3. **6a** — the library: persisted root handle and recursive index, then the pure fuzzy ranker and
-   recent/favourites/most-played ordering, then the sidebar UI on top of them.
+3. ~~**6a** — the library.~~ Done, apart from learning sets, favourite ordering and `.mscz`.
+   `findSong` and `toggleSidebar` joined the `Command` union, and the finder stands the shortcuts
+   down while it has focus, using the same switch the cheat sheet does.
 
 **Settled (Chrome 151, Linux, 2026-08-18) — measured, not assumed.** A throwaway probe picked a
 music folder, stored the handle in IndexedDB and indexed 84 scores, and Chrome was then fully

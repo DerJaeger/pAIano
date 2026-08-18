@@ -65,6 +65,8 @@ export const DEFAULT_BINDINGS: Bindings = {
   arrowup: 'tempoUp',
   g: 'toggleGuideOutput',
   h: 'cycleHands',
+  f: 'findSong',
+  b: 'toggleSidebar',
   'shift+/': 'showHelp',
   '?': 'showHelp',
 };

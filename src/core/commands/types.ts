@@ -20,6 +20,8 @@ export type Command =
   | 'tempoDown'
   | 'toggleGuideOutput'
   | 'cycleHands'
+  | 'findSong'
+  | 'toggleSidebar'
   | 'showHelp';
 
 /** Every command, in the order the cheat sheet lists them. */
@@ -35,6 +37,8 @@ export const COMMANDS: readonly Command[] = [
   'tempoDown',
   'toggleGuideOutput',
   'cycleHands',
+  'findSong',
+  'toggleSidebar',
   'showHelp',
 ];
 
@@ -51,6 +55,8 @@ export const COMMAND_LABELS: Record<Command, string> = {
   tempoDown: 'Slower',
   toggleGuideOutput: 'Guide to MIDI out on and off',
   cycleHands: 'Which hand the guide plays',
+  findSong: 'Find a piece',
+  toggleSidebar: 'Show or hide the library',
   showHelp: 'Show these shortcuts',
 };
 
@@ -63,4 +69,7 @@ export interface CommandContext {
   score: Score;
   transport: Transport;
   onShowHelp?: () => void;
+  /** Focuses the library's search box. */
+  onFindSong?: () => void;
+  onToggleSidebar?: () => void;
 }
