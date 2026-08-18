@@ -374,12 +374,18 @@ th {
 }
 
 .speed,
-.count-in {
+.count-in,
+.guide-switch {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+/* Flipped often enough mid-practice to be worth pointing at. */
+.guide-switch {
+  cursor: pointer;
 }
 
 .speed select {

@@ -3,6 +3,7 @@ import { tracksOf } from '../core/score/tracks';
 import type { Score } from '../core/score/types';
 import type { Transport } from '../core/transport/transport';
 import { measureIndexAt } from '../core/notation/position';
+import { writeSetting } from './settings';
 import { useMidiDevices } from './useMidi';
 import { useTransportState } from './useTransport';
 
@@ -25,7 +26,7 @@ export function TransportPanel({
   output: MidiOutputPort | undefined;
   positionTick: number;
 }) {
-  const { state, speed, loop, selection } = useTransportState(transport);
+  const { state, speed, loop, selection, guideAudible } = useTransportState(transport);
   const { devices, selectedId } = useMidiDevices(output);
   const tracks = tracksOf(score);
   const measureIndex = measureIndexAt(score, positionTick) ?? score.measures.length - 1;
@@ -143,23 +144,42 @@ export function TransportPanel({
           &ldquo;local off&rdquo; setting changed.
         </p>
       ) : (
-        <label className="device-picker">
-          Play through
-          <select
-            value={selectedId ?? ''}
-            onChange={(event) => {
-              output?.select(event.target.value || undefined);
-            }}
-          >
-            <option value="">Nothing (silent)</option>
-            {devices.map((device) => (
-              <option key={device.id} value={device.id}>
-                {device.name}
-                {device.manufacturer && ` — ${device.manufacturer}`}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="transport-row">
+          <label className="device-picker">
+            Play through
+            <select
+              value={selectedId ?? ''}
+              onChange={(event) => {
+                output?.select(event.target.value || undefined);
+              }}
+            >
+              <option value="">Nothing (silent)</option>
+              {devices.map((device) => (
+                <option key={device.id} value={device.id}>
+                  {device.name}
+                  {device.manufacturer && ` — ${device.manufacturer}`}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {/*
+            The practise/listen switch. It gates the sends rather than the
+            connection, so it can be flipped mid-piece — which is the whole
+            point, and why it is not just "pick no device".
+          */}
+          <label className="guide-switch">
+            <input
+              type="checkbox"
+              checked={guideAudible}
+              onChange={(event) => {
+                transport.setGuideAudible(event.target.checked);
+                writeSetting('guideAudible', event.target.checked);
+              }}
+            />
+            Send guide to MIDI out
+          </label>
+        </div>
       )}
     </section>
   );

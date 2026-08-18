@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RecordingMidiOutput } from '../core/midi/output';
@@ -13,6 +13,7 @@ import {
 import { parseMusicXml } from '../core/score/musicxml/parseMusicXml';
 import { FakeClock } from '../core/transport/clock';
 import { Transport } from '../core/transport/transport';
+import { readSetting } from './settings';
 import { TransportPanel } from './TransportPanel';
 
 const musicXml = scoreXml([
@@ -43,6 +44,10 @@ function show(options: { positionTick?: number } = {}) {
   );
   return { transport, output, clock, user };
 }
+
+beforeEach(() => {
+  localStorage.clear();
+});
 
 describe('TransportPanel', () => {
   it('plays and pauses', async () => {
@@ -107,6 +112,40 @@ describe('TransportPanel', () => {
 
     // Four woodblock clicks on the percussion channel, before any music.
     expect(output.sent.filter((sent) => sent.channel === 9)).toHaveLength(4);
+  });
+
+  it('switches the guide off without dropping the device', async () => {
+    const { transport, output, user } = show();
+    const device = output.getSelectedDeviceId();
+
+    await user.click(screen.getByRole('checkbox', { name: /Send guide to MIDI out/i }));
+
+    expect(transport.isGuideAudible()).toBe(false);
+    // The point of the switch: the instrument stays connected, so flipping back
+    // is instant rather than a trip through the device picker.
+    expect(output.getSelectedDeviceId()).toBe(device);
+  });
+
+  it('remembers the guide switch across a reload', async () => {
+    const { user } = show();
+
+    await user.click(screen.getByRole('checkbox', { name: /Send guide to MIDI out/i }));
+
+    expect(readSetting('guideAudible', true)).toBe(false);
+  });
+
+  it('shows the switch as the transport has it', () => {
+    const clock = new FakeClock(1000);
+    const output = new RecordingMidiOutput(() => clock.now());
+    const transport = new Transport({ score, output, clock });
+    transport.setGuideAudible(false);
+
+    render(<TransportPanel score={score} transport={transport} output={output} positionTick={0} />);
+
+    expect(screen.getByRole('checkbox', { name: /Send guide to MIDI out/i })).toHaveProperty(
+      'checked',
+      false,
+    );
   });
 
   it('can send the guide nowhere', async () => {

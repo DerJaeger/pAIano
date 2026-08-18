@@ -156,3 +156,41 @@ test('plays the guide nowhere when you pick no destination', async ({ page }) =>
 
   expect(await noteOns(page)).toEqual([]);
 });
+
+test('switches between practising and listening mid-piece, keeping the device', async ({
+  page,
+}) => {
+  await openAndConnect(page);
+  const guideSwitch = page.getByRole('checkbox', { name: 'Send guide to MIDI out' });
+
+  await guideSwitch.uncheck();
+  await page.getByRole('button', { name: 'Play' }).click();
+  await page.waitForTimeout(600);
+
+  // Silent while you are the one playing — but the music is still running, so
+  // this is a mute, not a stop.
+  expect(await noteOns(page)).toEqual([]);
+  await expect(page.getByText('Bar 1 of 2')).toBeVisible();
+
+  // Flipped back mid-piece, without going anywhere near the device picker.
+  await guideSwitch.check();
+  await expect(page.getByText('Bar 2 of 2')).toBeVisible({ timeout: 5000 });
+
+  expect((await noteOns(page)).length).toBeGreaterThan(0);
+  await expect(page.getByLabel('Play through')).toHaveValue('stub-out');
+});
+
+test('remembers the guide switch across a reload', async ({ page }) => {
+  await openAndConnect(page);
+  await page.getByRole('checkbox', { name: 'Send guide to MIDI out' }).uncheck();
+
+  await page.reload();
+  await page.getByRole('button', { name: 'Connect a keyboard' }).click();
+  await page.getByLabel('Open a score').setInputFiles({
+    name: 'two-bars.musicxml',
+    mimeType: 'application/vnd.recordare.musicxml+xml',
+    buffer: Buffer.from(musicXml, 'utf8'),
+  });
+
+  await expect(page.getByRole('checkbox', { name: 'Send guide to MIDI out' })).not.toBeChecked();
+});

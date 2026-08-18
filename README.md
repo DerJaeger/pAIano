@@ -46,6 +46,13 @@ at its own pitch, wherever the playhead stands, right note or not. See
 [ADR-0006](docs/adr/0006-reading-aids.md) for how a pitch nothing in the piece plays
 still finds its line.
 
+**Send guide to MIDI out** switches between practising and listening without touching
+the device picker: off, the guide is silent and you are the sound; on, it plays along
+with you. It gates the notes rather than the connection, so it takes effect mid-piece
+and the instrument stays selected either way. The count-in click is not gated by it —
+it is a metronome, and it is how you know when to come in. The setting is remembered
+between sessions.
+
 The guide needs an instrument that accepts incoming MIDI, and most keyboards want their
 &ldquo;local control off&rdquo; setting so the guide does not fight your own playing.
 

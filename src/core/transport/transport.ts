@@ -25,6 +25,8 @@ export interface TransportOptions {
   clickChannel?: number;
   countInBeats?: number;
   speed?: number;
+  /** Whether the guide starts audible. Persisted by the UI across sessions. */
+  guideAudible?: boolean;
 }
 
 const DEFAULTS = {
@@ -34,6 +36,7 @@ const DEFAULTS = {
   clickChannel: 9,
   countInBeats: 0,
   speed: 1,
+  guideAudible: true,
 };
 
 /** GM: 76 is a high wood block, 77 the low one. */
@@ -75,6 +78,8 @@ export class Transport {
 
   private countInBeats: number;
   private speed: number;
+  /** Whether the guide is sent out at all — practise silently, or listen along. */
+  private guideAudible: boolean;
   private state: TransportState = 'stopped';
   private loop: LoopRange | undefined;
   private selection: TrackSelection = ALL_TRACKS;
@@ -96,6 +101,7 @@ export class Transport {
     this.clickChannel = options.clickChannel ?? DEFAULTS.clickChannel;
     this.countInBeats = options.countInBeats ?? DEFAULTS.countInBeats;
     this.speed = options.speed ?? DEFAULTS.speed;
+    this.guideAudible = options.guideAudible ?? DEFAULTS.guideAudible;
     this.events = this.score.events;
   }
 
@@ -115,6 +121,10 @@ export class Transport {
 
   getSelection(): TrackSelection {
     return this.selection;
+  }
+
+  isGuideAudible(): boolean {
+    return this.guideAudible;
   }
 
   /** Where playback is right now, on the repeat-expanded timeline. */
@@ -223,6 +233,24 @@ export class Transport {
     });
   }
 
+  /**
+   * Whether the guide reaches the instrument: off is practice, on is listening
+   * along. It gates the sends, not the connection — the device stays selected,
+   * the clock keeps running and the cursor keeps moving, so flipping it is
+   * instant and mid-piece rather than a trip to the device picker.
+   *
+   * Re-anchoring rather than just setting the flag is what makes it immediate in
+   * both directions: it panics away notes already queued or sounding on the way
+   * down, and re-sends the note under the playhead on the way up, exactly as
+   * un-muting a hand does.
+   */
+  setGuideAudible(audible: boolean): void {
+    if (audible === this.guideAudible) return;
+    this.reconfigure(() => {
+      this.guideAudible = audible;
+    });
+  }
+
   setCountInBeats(beats: number): void {
     this.countInBeats = Math.max(0, Math.floor(beats));
     this.notify();
@@ -321,6 +349,10 @@ export class Transport {
   }
 
   private emit(event: NoteEvent, startTime: number, lap: Lap): void {
+    // The count-in is deliberately not gated here: it is a metronome, and it is
+    // how you know when to come in on a part you are playing yourself.
+    if (!this.guideAudible) return;
+
     const endTick = event.startTick + event.durationTicks;
     // A note may not ring across a loop jump — the music has moved on.
     const endTime = Math.min(this.timeline!.timeOf(endTick, lap.index), lap.endTime);

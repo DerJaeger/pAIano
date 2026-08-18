@@ -203,7 +203,7 @@ skip the one you cannot get.
 Which notes are yours to play is not a new setting: they are exactly the ones the guide has been
 muted out of, so Phase 4's mute checkboxes do both jobs and cannot drift apart.
 
-### Phase 6 — Library, control, and the practice/listen switch ⬅ **next**
+### Phase 6 — Library, control, and the practice/listen switch ⬅ **in progress**
 
 Three strands. They ship together because they are the same complaint: once you are sitting at the
 keyboard, every interaction still costs a trip to the mouse and a dialog.
@@ -256,7 +256,7 @@ leaving. Two input surfaces, one command layer.
 - **Done when:** you can find, start, loop and restart a piece without touching the mouse — and
   restart the bar you just fluffed without lifting your hands off the keys at all.
 
-#### 6c — Guide output toggle
+#### 6c — Guide output toggle ✅
 - **One checkbox: "Send guide to MIDI out."** Off = practice (silent guide, you are the sound),
   on = listen along. Today the only way to switch is to unselect and re-select the output device,
   which is absurd for something you toggle every few minutes.
@@ -265,6 +265,14 @@ leaving. Two input surfaces, one command layer.
   nothing hangs. Bound to a command in 6b, and persisted.
 - **Done when:** you can flip between practising and listening mid-piece, instantly, without
   touching the device picker.
+
+Landed as `Transport.setGuideAudible()`. It re-anchors rather than only setting a flag, which is
+what makes it immediate in both directions — the same machinery that mutes a hand mid-phrase, so
+turning the guide off drops what is queued and turning it back on resumes the note under the
+playhead rather than waiting for the next one. The count-in is deliberately left outside the gate:
+it is a metronome, not the guide, and it is how you know when to come in on a part you are playing
+yourself. Persisting it brought the first `localStorage` setting into the app (`ui/settings.ts`),
+which 6b's binding map will reuse.
 
 ### Phase 7 — PDF path (option 1 from the brief)
 - Pair a `.pdf` with a `.mid`, render pages with pdf.js, play the MIDI as the guide.
@@ -323,9 +331,10 @@ Phases 0–5 are done: a MuseScore export parses, renders, plays out to your ins
 what you play. What is missing is everything *around* the practice loop — getting to a piece, and
 controlling it without leaving the keyboard. That is Phase 6.
 
-1. **6c first** — the guide-output checkbox. Smallest change, largest daily relief, and it
-   establishes the "command, not a device reconnection" shape that 6b builds on.
+1. ~~**6c** — the guide-output checkbox.~~ Done: it gates the sends, not the connection, and
+   established the "command, not a device reconnection" shape that 6b builds on.
 2. **6b** — the `Command` layer, keyboard bindings, then the MIDI gesture recognizer test-first.
+   `toggle MIDI output` is already a method on `Transport` waiting for a binding.
 3. **6a** — the library: persisted root handle and recursive index, then the pure fuzzy ranker and
    recent/favourites/most-played ordering, then the sidebar UI on top of them.
 

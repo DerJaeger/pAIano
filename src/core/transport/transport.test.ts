@@ -417,6 +417,86 @@ describe('Transport, muting a hand', () => {
   });
 });
 
+describe('Transport, the guide switch', () => {
+  it('sends the guide out by default', () => {
+    const engine = transport();
+
+    expect(engine.isGuideAudible()).toBe(true);
+  });
+
+  it('schedules nothing while the guide is switched off', () => {
+    const engine = transport();
+    engine.setGuideAudible(false);
+
+    engine.play();
+    run(engine, 2000);
+
+    expect(output.sent).toEqual([]);
+  });
+
+  it('keeps time while silent, so the cursor still tracks the music', () => {
+    const engine = transport();
+    engine.setGuideAudible(false);
+
+    engine.play();
+    run(engine, 1000);
+
+    expect(engine.getPositionTick()).toBe(scale().tempoMap.ticksPerQuarter * 2);
+  });
+
+  it('silences a note already sounding when switched off mid-flight', () => {
+    const engine = transport();
+
+    engine.play();
+    // Far enough in that the next note is queued but has not sounded.
+    run(engine, 425);
+    expect(pending().length).toBeGreaterThan(0);
+
+    engine.setGuideAudible(false);
+
+    expect(output.panics.length).toBeGreaterThan(0);
+    expect(pending()).toEqual([]);
+  });
+
+  it('picks the guide back up mid-flight, mid-note', () => {
+    const engine = transport();
+    engine.setGuideAudible(false);
+    engine.play();
+    // Half way through the second note: nothing has been sent at all.
+    run(engine, 750);
+    expect(output.sent).toEqual([]);
+
+    engine.setGuideAudible(true);
+
+    // The note under the playhead resumes rather than waiting for the next one,
+    // the same way un-muting a hand does.
+    expect(output.sent.map((sent) => sent.midiNote)).toEqual([62]);
+  });
+
+  it('does not re-anchor when set to what it already is', () => {
+    const engine = transport();
+
+    engine.play();
+    run(engine, 100);
+    const panics = output.panics.length;
+    engine.setGuideAudible(true);
+
+    expect(output.panics.length).toBe(panics);
+  });
+
+  it('still counts you in with the guide off', () => {
+    const engine = transport(scale(), { countInBeats: 2, clickChannel: 9 });
+    engine.setGuideAudible(false);
+
+    engine.play();
+    run(engine, 1200);
+
+    // The click is a metronome, not the guide: it is how you know when to come
+    // in on a part you are playing yourself.
+    expect(output.sent.map((sent) => sent.channel)).toEqual([9, 9]);
+  });
+});
+
 describe('Transport, count-in', () => {
   it('delays the music by the count-in and clicks the beats', () => {
     const engine = transport(scale(), { countInBeats: 2, clickChannel: 9 });

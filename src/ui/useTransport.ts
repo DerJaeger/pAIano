@@ -3,6 +3,7 @@ import type { MidiOutputPort } from '../core/midi/output';
 import type { Score } from '../core/score/types';
 import { performanceClock, type Clock } from '../core/transport/clock';
 import { Transport } from '../core/transport/transport';
+import { readSetting } from './settings';
 
 /**
  * How often the scheduler is asked to refill its lookahead window. Well under
@@ -31,7 +32,15 @@ export function useTransport(
       return;
     }
 
-    const engine = new Transport({ score, output, clock });
+    // The switch is read here rather than held in React state because the
+    // transport is the one source of truth for it; storage only seeds a fresh
+    // engine and records what the player last chose.
+    const engine = new Transport({
+      score,
+      output,
+      clock,
+      guideAudible: readSetting('guideAudible', true),
+    });
     setTransport(engine);
     const ticker = setInterval(() => {
       engine.tick();
@@ -57,8 +66,9 @@ export function useTransportState(transport: Transport | undefined) {
   const speed = useSyncExternalStore(subscribe, () => transport?.getSpeed() ?? 1);
   const loop = useSyncExternalStore(subscribe, () => transport?.getLoop());
   const selection = useSyncExternalStore(subscribe, () => transport?.getSelection());
+  const guideAudible = useSyncExternalStore(subscribe, () => transport?.isGuideAudible() ?? true);
 
-  return { state, speed, loop, selection };
+  return { state, speed, loop, selection, guideAudible };
 }
 
 /**

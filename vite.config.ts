@@ -12,6 +12,7 @@ export default defineConfig({
     // a `// @vitest-environment jsdom` docblock.
     environment: 'node',
     globals: true,
+    setupFiles: ['src/test/setup.ts'],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     coverage: {
       include: ['src/core/**'],
