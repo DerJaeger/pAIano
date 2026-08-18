@@ -84,7 +84,7 @@ describe('keyboard commands', () => {
     expect(transport.getState()).toBe('stopped');
   });
 
-  it('leaves browser shortcuts alone', async () => {
+  it('leaves unbound browser shortcuts alone', async () => {
     const user = userEvent.setup();
 
     await user.keyboard('{Control>} {/Control}');

@@ -1,7 +1,8 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { attributes, backup, note, score } from '../src/core/score/musicxml/fixtures';
+import { openPiece, stubMusicFolder } from './musicFolder';
 import { play, stubMidiKeyboard } from './midiStub';
 
 /**
@@ -26,12 +27,9 @@ const musicXml = score(
 );
 
 async function openScore(page: Page): Promise<void> {
+  await stubMusicFolder(page, { 'three-bars.musicxml': musicXml });
   await page.goto('/');
-  await page.getByLabel('Open a score').setInputFiles({
-    name: 'three-bars.musicxml',
-    mimeType: 'application/vnd.recordare.musicxml+xml',
-    buffer: Buffer.from(musicXml, 'utf8'),
-  });
+  await openPiece(page, 'three-bars');
 }
 
 const highlighted = (page: Page) => page.locator(`.sheet svg [fill="${HIGHLIGHT}"]`);
@@ -68,12 +66,9 @@ const manyBars = score(
 );
 
 test('shows a window of lines and scrolls it as the score moves on', async ({ page }) => {
+  await stubMusicFolder(page, { 'many-bars.musicxml': manyBars });
   await page.goto('/');
-  await page.getByLabel('Open a score').setInputFiles({
-    name: 'many-bars.musicxml',
-    mimeType: 'application/vnd.recordare.musicxml+xml',
-    buffer: Buffer.from(manyBars, 'utf8'),
-  });
+  await openPiece(page, 'many-bars');
 
   const sheet = page.locator('.sheet');
   await expect(sheet.locator('svg').first()).toBeVisible();
@@ -153,13 +148,10 @@ const grandStaff = score([
 
 test('draws the keys you are holding on the staff at their own pitch', async ({ page }) => {
   await stubMidiKeyboard(page);
+  await stubMusicFolder(page, { 'grand-staff.musicxml': grandStaff });
   await page.goto('/');
   await page.getByRole('button', { name: 'Connect a keyboard' }).click();
-  await page.getByLabel('Open a score').setInputFiles({
-    name: 'grand-staff.musicxml',
-    mimeType: 'application/vnd.recordare.musicxml+xml',
-    buffer: Buffer.from(grandStaff, 'utf8'),
-  });
+  await openPiece(page, 'grand-staff');
   await expect(page.locator('.sheet svg')).toBeVisible();
 
   const bar = (midiNote: number) => page.locator(`.held-note[data-note="${String(midiNote)}"]`);
@@ -197,8 +189,11 @@ test.describe(() => {
   test.skip(!existsSync(samplePath), 'no local MuseScore export to render');
 
   test('renders a real MuseScore export and jumps to a late bar', async ({ page }) => {
+    await stubMusicFolder(page, {
+      'adele-skyfall.mxl': { base64: readFileSync(samplePath).toString('base64') },
+    });
     await page.goto('/');
-    await page.getByLabel('Open a score').setInputFiles(samplePath);
+    await openPiece(page, 'skyfall');
 
     await expect(page.locator('.sheet svg').first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText('Bar 1 of 89')).toBeVisible();

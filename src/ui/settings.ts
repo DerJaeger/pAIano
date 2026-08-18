@@ -14,7 +14,7 @@
 /** Namespaced so we cannot collide with anything else served from the origin. */
 const PREFIX = 'web-pianobooster:';
 
-export type SettingKey = 'guideAudible' | 'bindings' | 'sidebarCollapsed';
+export type SettingKey = 'guideAudible' | 'bindings' | 'lastScorePath';
 
 export function readSetting<T>(key: SettingKey, fallback: T): T {
   try {

@@ -239,6 +239,18 @@ permission exists, and only opening a file waits on the Reconnect click. `mergeS
 title and composer of any file whose size and date have not moved, so a rescan re-reads only what
 changed rather than re-opening 84 files for names that cannot have changed.
 
+The sidebar became an **overlay palette** in review: opening a piece is occasional, and a panel
+that permanently narrows the sheet earns its space badly. As an overlay the whole interaction is
+keyboard-shaped — summon, type, arrow, Enter, Escape — and `alt+p` joins `f` as the gesture people
+already have in their fingers. `ctrl+p` was tried first and rejected: it is the browser's Print,
+and a shortcut you have to wrestle away from the browser is the wrong kind of familiar, so the
+no-ctrl rule in ADR-0007 stands unbroken.
+
+Two counting bugs were fixed at the same time: `playCount` incremented on every *open*, so clicking
+a piece to look at it made it your most played. Opening and playing are now separate, and a play is
+counted once per session in which the transport actually ran. And the last opened piece is
+remembered, reopening itself as soon as the folder is readable.
+
 **Not done, and deliberately deferred:** user-defined learning sets, user ordering of favourites,
 and `.mscz` via webmscore. The four sections and the finder are what make the library usable; sets
 are a second organising scheme on top of one that now works, and are better designed against real

@@ -41,15 +41,28 @@ export function mergeScan(catalog: Catalog, scanned: readonly ScannedFile[]): Ca
   return { entries, history: catalog.history, needsParsing };
 }
 
-/** Records that a piece was opened — which drives both Recent and Most played. */
+/** Records that a piece was opened, which is what Recent is ordered by. */
 export function recordOpened(catalog: Catalog, path: string, at: number): Catalog {
   const previous = catalog.history[path] ?? NO_HISTORY;
   return {
     ...catalog,
-    history: {
-      ...catalog.history,
-      [path]: { ...previous, lastOpenedAt: at, playCount: previous.playCount + 1 },
-    },
+    history: { ...catalog.history, [path]: { ...previous, lastOpenedAt: at } },
+  };
+}
+
+/**
+ * Records that a piece was actually played.
+ *
+ * Separate from opening on purpose: clicking a piece four times to look at it
+ * must not make it your most-played piece. The caller counts one per session in
+ * which the transport ran, so an hour of restarts on one bar is one play, and
+ * browsing is none.
+ */
+export function recordPlayed(catalog: Catalog, path: string): Catalog {
+  const previous = catalog.history[path] ?? NO_HISTORY;
+  return {
+    ...catalog,
+    history: { ...catalog.history, [path]: { ...previous, playCount: previous.playCount + 1 } },
   };
 }
 

@@ -30,11 +30,12 @@ const NAMED_KEYS: Record<string, string> = {
  * unreachable because of a lock key nobody remembers pressing.
  */
 export function chordOf(event: KeyEvent): string {
-  const named = NAMED_KEYS[event.key];
-  if (named !== undefined) return named;
-
-  const key = event.key.toLowerCase();
-  const shift = event.shiftKey || (event.key.length === 1 && event.key !== key);
+  // The named-key lookup replaces the key's *name* only. It must not short
+  // circuit the modifiers, or ctrl+space would be indistinguishable from space
+  // and every browser chord built on one would fire the plain binding.
+  const lowered = event.key.toLowerCase();
+  const key = NAMED_KEYS[event.key] ?? lowered;
+  const shift = event.shiftKey || (event.key.length === 1 && event.key !== lowered);
   return [
     event.metaKey ? 'meta' : '',
     event.ctrlKey ? 'ctrl' : '',
@@ -50,8 +51,13 @@ export function chordOf(event: KeyEvent): string {
  * What the app answers to out of the box.
  *
  * Single unmodified keys throughout: your hands are on the piano, and a chord
- * that needs two fingers on the computer keyboard defeats the point. Nothing
- * uses ctrl or meta, which belong to the browser and the OS.
+ * that needs two fingers on the computer keyboard defeats the point.
+ *
+ * `alt+p` opens the library alongside `f` — the palette gesture people have in
+ * their fingers from editors, without taking a shortcut the browser already
+ * owns. `ctrl+p` would be the familiar one, but it is Print, and a shortcut you
+ * have to wrestle away from the browser is the wrong kind of familiar. Nothing
+ * here uses ctrl or meta.
  */
 export const DEFAULT_BINDINGS: Bindings = {
   space: 'playPause',
@@ -66,7 +72,7 @@ export const DEFAULT_BINDINGS: Bindings = {
   g: 'toggleGuideOutput',
   h: 'cycleHands',
   f: 'findSong',
-  b: 'toggleSidebar',
+  'alt+p': 'findSong',
   'shift+/': 'showHelp',
   '?': 'showHelp',
 };

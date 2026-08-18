@@ -3,6 +3,7 @@ import {
   emptyCatalog,
   mergeScan,
   recordOpened,
+  recordPlayed,
   toggleFavourite as toggleFavouriteIn,
 } from '../core/library/catalog';
 import { readMetadata } from '../core/library/metadata';
@@ -26,6 +27,8 @@ export interface Library {
   reconnect: () => Promise<void>;
   rescan: () => Promise<void>;
   toggleFavourite: (path: string) => void;
+  /** Counts one play. The caller calls it once per session that actually ran. */
+  markPlayed: (path: string) => void;
   /** Reads a score's bytes and records that it was opened. */
   open: (path: string) => Promise<Uint8Array | undefined>;
 }
@@ -168,6 +171,13 @@ export function useLibrary(port: LibraryPort | undefined, cache?: CatalogCache):
     [catalog, save],
   );
 
+  const markPlayed = useCallback(
+    (path: string) => {
+      save(recordPlayed(catalog, path));
+    },
+    [catalog, save],
+  );
+
   const open = useCallback(
     async (path: string) => {
       if (!port) return undefined;
@@ -197,8 +207,21 @@ export function useLibrary(port: LibraryPort | undefined, cache?: CatalogCache):
       reconnect,
       rescan,
       toggleFavourite,
+      markPlayed,
       open,
     }),
-    [catalog, access, rootName, busy, error, pickRoot, reconnect, rescan, toggleFavourite, open],
+    [
+      catalog,
+      access,
+      rootName,
+      busy,
+      error,
+      pickRoot,
+      reconnect,
+      rescan,
+      toggleFavourite,
+      markPlayed,
+      open,
+    ],
   );
 }

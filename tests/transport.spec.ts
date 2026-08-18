@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { attributes, backup, note, score, tempo } from '../src/core/score/musicxml/fixtures';
+import { openPiece, stubMusicFolder } from './musicFolder';
 
 /**
  * Phase 4's acceptance journey: press play and the piece goes out to your
@@ -77,13 +78,10 @@ async function noteOns(page: Page): Promise<number[]> {
 
 async function openAndConnect(page: Page): Promise<void> {
   await stubMidiInstrument(page);
+  await stubMusicFolder(page, { 'two-bars.musicxml': musicXml });
   await page.goto('/');
   await page.getByRole('button', { name: 'Connect a keyboard' }).click();
-  await page.getByLabel('Open a score').setInputFiles({
-    name: 'two-bars.musicxml',
-    mimeType: 'application/vnd.recordare.musicxml+xml',
-    buffer: Buffer.from(musicXml, 'utf8'),
-  });
+  await openPiece(page, 'two-bars');
   await expect(page.locator('.sheet svg')).toBeVisible();
 }
 
@@ -186,11 +184,7 @@ test('remembers the guide switch across a reload', async ({ page }) => {
 
   await page.reload();
   await page.getByRole('button', { name: 'Connect a keyboard' }).click();
-  await page.getByLabel('Open a score').setInputFiles({
-    name: 'two-bars.musicxml',
-    mimeType: 'application/vnd.recordare.musicxml+xml',
-    buffer: Buffer.from(musicXml, 'utf8'),
-  });
+  await openPiece(page, 'two-bars');
 
   await expect(page.getByRole('checkbox', { name: 'Send guide to MIDI out' })).not.toBeChecked();
 });

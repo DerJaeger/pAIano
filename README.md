@@ -53,12 +53,14 @@ and the instrument stays selected either way. The count-in click is not gated by
 it is a metronome, and it is how you know when to come in. The setting is remembered
 between sessions.
 
-Point the **library** at your music folder once and it is remembered: the sidebar indexes
-every score under it, however deeply nested, and finds any of them by subsequence —
-`bmin inv` reaches `Bach/Inventions/Invention 15 in B minor`. Chrome asks again each
-session before a page may read the folder, so there is one **Reconnect** click per
-session; the list, the search and your favourites all work before you make it, because
-the index is our own data rather than the folder's.
+Point the **library** at your music folder once and it is remembered. <kbd>Alt</kbd>+<kbd>P</kbd>
+(or <kbd>F</kbd>) summons it over whatever you are playing: type a few letters, arrow to
+the one you meant, <kbd>Enter</kbd> to open it, <kbd>Esc</kbd> to leave things as they
+were. Matching is on subsequences, so `bmin inv` reaches
+`Bach/Inventions/Invention 15 in B minor`. Chrome asks again each session before a page
+may read the folder, so there is one **Reconnect** click per session; the list, the
+search and your favourites all work before you make it, because the index is our own data
+rather than the folder's. The piece you had open comes back when you reload.
 
 Nothing needs the mouse. Space plays and pauses, the arrows step bars and tempo, and
 `?` shows the rest — click any key in that list to move it somewhere you will

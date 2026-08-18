@@ -40,6 +40,11 @@ describe('chordOf', () => {
     expect(chordOf(key(' '))).toBe('space');
     expect(chordOf(key('ArrowLeft'))).toBe('arrowleft');
   });
+
+  it('still counts modifiers on a named key', () => {
+    // Ctrl+Space must not collapse into the plain space binding.
+    expect(chordOf(key(' ', { ctrlKey: true }))).toBe('ctrl+space');
+  });
 });
 
 describe('the default bindings', () => {
@@ -56,9 +61,15 @@ describe('the default bindings', () => {
   });
 
   it('leaves the browser its own shortcuts', () => {
-    // Anything with ctrl or meta belongs to the browser or the OS, and taking
-    // one hostage is a worse bug than the shortcut being unbound.
+    // Anything with ctrl or meta belongs to the browser or the OS — ctrl+p is
+    // Print — and wrestling one away is a worse bug than a shortcut nobody
+    // guessed. Alt is ours to use.
     expect(Object.keys(DEFAULT_BINDINGS).filter((chord) => /ctrl|meta/.test(chord))).toEqual([]);
+  });
+
+  it('opens the library on alt+p as well as f', () => {
+    expect(commandForKey(key('p', { altKey: true }), DEFAULT_BINDINGS)).toBe('findSong');
+    expect(commandForKey(key('f'), DEFAULT_BINDINGS)).toBe('findSong');
   });
 
   it('puts play/pause on the space bar', () => {

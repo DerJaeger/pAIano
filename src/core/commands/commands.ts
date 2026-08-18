@@ -71,10 +71,6 @@ export function runCommand(command: Command, context: CommandContext): void {
       context.onFindSong?.();
       return;
 
-    case 'toggleSidebar':
-      context.onToggleSidebar?.();
-      return;
-
     case 'showHelp':
       context.onShowHelp?.();
       return;

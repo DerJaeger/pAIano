@@ -6,6 +6,7 @@ import {
   mostPlayed,
   recent,
   recordOpened,
+  recordPlayed,
   toggleFavourite,
 } from './catalog';
 import type { ScannedFile } from './types';
@@ -109,11 +110,22 @@ describe('the sidebar orderings', () => {
 
   it('ranks most played by how often, not how recently', () => {
     let catalog = library();
-    catalog = recordOpened(catalog, 'a.musicxml', 100);
-    catalog = recordOpened(catalog, 'a.musicxml', 200);
-    catalog = recordOpened(catalog, 'b.musicxml', 300);
+    catalog = recordPlayed(catalog, 'a.musicxml');
+    catalog = recordPlayed(catalog, 'a.musicxml');
+    catalog = recordPlayed(catalog, 'b.musicxml');
 
     expect(mostPlayed(catalog).map((entry) => entry.path)).toEqual(['a.musicxml', 'b.musicxml']);
+  });
+
+  it('does not count merely opening a piece as playing it', () => {
+    // Clicking through the library to see what a piece looks like must not
+    // make it the piece you have played most.
+    let catalog = library();
+    catalog = recordOpened(catalog, 'a.musicxml', 100);
+    catalog = recordOpened(catalog, 'a.musicxml', 200);
+
+    expect(mostPlayed(catalog)).toEqual([]);
+    expect(recent(catalog).map((entry) => entry.path)).toEqual(['a.musicxml']);
   });
 
   it('stars and unstars', () => {

@@ -50,7 +50,10 @@ export class FileSystemLibrary implements LibraryPort {
   async pickRoot(): Promise<AccessState> {
     const root = await window.showDirectoryPicker({ mode: 'read', id: 'music-root' });
     this.root = root;
-    await idbPut(HANDLE_KEY, root);
+    // Best effort: a browser that will not persist the handle still gets a
+    // working library for this session, it just asks for the folder again next
+    // time. Failing the pick over it would be the worse outcome.
+    await idbPut(HANDLE_KEY, root).catch(() => undefined);
     return this.checkAccess();
   }
 

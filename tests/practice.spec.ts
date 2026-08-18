@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { attributes, note, score, tempo } from '../src/core/score/musicxml/fixtures';
+import { openPiece, stubMusicFolder } from './musicFolder';
 
 /**
  * Phase 5's acceptance journey: practise a piece and get told how it went.
@@ -76,13 +77,10 @@ async function playNote(page: Page, midiNote: number): Promise<void> {
 
 async function openAndConnect(page: Page): Promise<void> {
   await stubMidiDevice(page);
+  await stubMusicFolder(page, { 'practice.musicxml': musicXml });
   await page.goto('/');
   await page.getByRole('button', { name: 'Connect a keyboard' }).click();
-  await page.getByLabel('Open a score').setInputFiles({
-    name: 'practice.musicxml',
-    mimeType: 'application/vnd.recordare.musicxml+xml',
-    buffer: Buffer.from(musicXml, 'utf8'),
-  });
+  await openPiece(page, 'practice');
   await expect(page.locator('.sheet svg')).toBeVisible();
 }
 

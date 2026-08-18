@@ -33,11 +33,12 @@ export function useCommands(
     if (!enabled) return;
 
     function onKeyDown(event: KeyboardEvent): void {
-      // Ctrl and meta belong to the browser, and a shortcut fired while you are
-      // typing into a field is a bug rather than a convenience.
-      if (event.ctrlKey || event.metaKey || event.isComposing) return;
-      if (isTyping(event.target)) return;
+      // A shortcut fired while you are typing into a field is a bug, not a
+      // convenience.
+      if (event.isComposing || isTyping(event.target)) return;
 
+      // Only a chord that is actually bound is taken, so an unbound ctrl or
+      // meta combination still reaches the browser untouched.
       const command = commandForKey(event, bindings);
       if (!command || !latest.current) return;
 

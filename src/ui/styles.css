@@ -34,29 +34,6 @@ body {
   padding: 2rem 1.25rem 4rem;
 }
 
-/* The library sits beside the sheet, and gets out of the way when collapsed. */
-.app.with-library {
-  max-width: 84rem;
-  display: grid;
-  grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
-  gap: 1.5rem;
-  align-items: start;
-}
-
-.app.with-library.rail {
-  grid-template-columns: auto minmax(0, 1fr);
-}
-
-@media (max-width: 60rem) {
-  .app.with-library {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.app-main {
-  min-width: 0;
-}
-
 h1 {
   margin: 0 0 0.25rem;
   font-size: 1.6rem;
@@ -631,35 +608,143 @@ th {
   cursor: pointer;
 }
 
-/* --- Library sidebar --- */
-.library {
-  position: sticky;
-  top: 1rem;
-  max-height: calc(100vh - 2rem);
+/* --- Library palette: an overlay you summon, not a panel you live with --- */
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 6vh 1rem 1rem;
+  background: rgb(0 0 0 / 45%);
+}
+
+.palette {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  width: min(44rem, 100%);
+  max-height: 80vh;
   padding: 0.9rem;
   border: 1px solid var(--line);
-  border-radius: 0.6rem;
+  border-radius: 0.7rem;
+  background: var(--bg);
+  box-shadow: 0 1.5rem 3rem rgb(0 0 0 / 30%);
+}
+
+.palette-search {
+  font: inherit;
+  font-size: 1.05rem;
+  width: 100%;
+  box-sizing: border-box;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   overflow-y: auto;
 }
 
-.library-header {
+.palette-list h3 {
+  margin: 0.7rem 0 0.25rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.palette-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: 'name star' 'where star';
+  align-items: center;
+  gap: 0 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+}
+
+/* One highlight, moved by the arrows and by the mouse alike. */
+.palette-row.selected {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.palette-name {
+  grid-area: name;
+}
+
+.palette-where {
+  grid-area: where;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.palette-name,
+.palette-where {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-row mark {
+  background: none;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.palette-star {
+  grid-area: star;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  padding: 0.25rem;
+  cursor: pointer;
+}
+
+.palette-star.on {
+  color: var(--accent);
+}
+
+.palette-reconnect {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
 }
 
-.library-header h2 {
-  margin: 0;
-  font-size: 1.05rem;
+.palette-empty {
+  padding: 0.5rem;
+  text-align: center;
 }
 
-.library-collapse,
-.library-rescan {
+.palette-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.palette-rescan {
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   color: var(--muted);
   background: none;
   border: 1px solid var(--line);
@@ -668,118 +753,12 @@ th {
   cursor: pointer;
 }
 
-.library-rail {
-  position: sticky;
-  top: 1rem;
-}
-
-.library-search {
+/* The header now carries the only way in, so it says which keys do it. */
+header kbd {
   font: inherit;
-  width: 100%;
-  box-sizing: border-box;
-  color: var(--fg);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 0.4rem;
-  padding: 0.45rem 0.6rem;
-}
-
-.library-section h3 {
-  margin: 0.6rem 0 0.3rem;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-}
-
-.library-section ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.library-section li {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-}
-
-.library-row {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
-  font: inherit;
-  text-align: left;
-  color: var(--fg);
-  background: none;
-  border: 0;
-  border-radius: 0.35rem;
-  padding: 0.3rem 0.4rem;
-  cursor: pointer;
-}
-
-.library-row:hover {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
-
-.library-row.open {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-}
-
-.library-name,
-.library-where {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.library-where {
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
-/* What you typed, inside what it found. */
-.library-row mark {
-  background: none;
-  color: var(--accent);
-  font-weight: 700;
-}
-
-.library-star {
-  font-size: 0.95rem;
-  line-height: 1;
-  color: var(--muted);
-  background: none;
-  border: 0;
-  padding: 0.2rem;
-  cursor: pointer;
-}
-
-.library-star.on {
-  color: var(--accent);
-}
-
-.library-reconnect,
-.library-empty {
-  border: 1px solid var(--line);
-  border-radius: 0.45rem;
-  padding: 0.7rem;
-}
-
-.library-reconnect p,
-.library-empty p {
-  margin: 0 0 0.6rem;
-  font-size: 0.82rem;
-}
-
-.library-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-top: auto;
-  padding-top: 0.5rem;
-  font-size: 0.75rem;
+  font-size: 0.8em;
+  border: 1px solid currentcolor;
+  border-radius: 0.25rem;
+  padding: 0 0.25rem;
+  opacity: 0.8;
 }
