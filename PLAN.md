@@ -203,12 +203,68 @@ skip the one you cannot get.
 Which notes are yours to play is not a new setting: they are exactly the ones the guide has been
 muted out of, so Phase 4's mute checkboxes do both jobs and cannot drift apart.
 
-### Phase 6 — Library
-- Open a single file, or a folder recursively (FS Access API), or drag-and-drop.
-- Persist directory handles + per-score progress in IndexedDB; re-request permission on return.
-- Score list with search, favourites, and **learning sets** (user-defined collections).
+### Phase 6 — Library, control, and the practice/listen switch ⬅ **next**
+
+Three strands. They ship together because they are the same complaint: once you are sitting at the
+keyboard, every interaction still costs a trip to the mouse and a dialog.
+
+#### 6a — The library
+- **One music root.** Pick a folder once (e.g. `/home/user/music`); it is scanned recursively for
+  scores, however deeply nested. The directory handle is persisted in IndexedDB and re-opened on
+  the next startup — a permission re-prompt on return is the only friction, and we ask for it
+  eagerly rather than at first click. Firefox, with no FS Access API, falls back to
+  `<input webkitdirectory>` + drag-and-drop and re-picks each session; the UI states that plainly.
+- **Retractable left sidebar** holding the whole library, collapsed to a rail when you want the
+  sheet full-width. Its open/closed state persists. Sections:
+  - **Find song** — a **fuzzy finder** over the indexed paths (title, composer, folder segments),
+    ranked with match highlighting, keyboard-navigable, matching on subsequences rather than
+    substrings so `bmin inv` finds `Bach/Inventions/Invention 15 in B minor.musicxml`.
+  - **Recent** — last opened, most recent first.
+  - **Favourites** — starred, user-ordered.
+  - **Most played** — by session count, which means we finally record per-score play history
+    alongside the existing per-score progress.
+- **Learning sets** (user-defined collections) sit in the same sidebar.
+- The scan builds a persisted index (path, mtime, parsed title/composer) so startup is instant and
+  re-scanning is incremental; a manual "rescan" is available for files added outside the app.
 - Optional `.mscz` support via lazy-loaded webmscore.
-- **Done when:** point it at your MuseScore folder once, and your library is just there.
+- **Core/port shape:** `LibraryPort` gains recursive enumeration; the index, the fuzzy ranker, and
+  the recent/favourite/most-played ordering are **pure core** (`core/library/`) and unit-tested
+  against a fake file tree — no browser API in a single one of those tests.
+- **Done when:** point it at your MuseScore folder once, and on every later startup your library is
+  just there and any piece is three keystrokes away.
+
+#### 6b — Keyboard and pedal commands
+Practising means your hands are on the keys, so the transport has to be reachable without them
+leaving. Two input surfaces, one command layer.
+
+- **A `Command` enum in core** (`play/pause`, `stop`, `restart bar`, `repeat bar` (loop it),
+  `previous bar`, `next bar`, `restart song`, `find song`, `toggle sidebar`, `tempo ±`,
+  `toggle hands`, `toggle MIDI output`, …). Both surfaces below dispatch into it, so a command is
+  defined and tested exactly once and the two bindings cannot drift.
+- **Keyboard shortcuts** bound to it, with a discoverable cheat-sheet overlay (`?`) and a
+  user-editable binding map persisted locally. Care needed: shortcuts must not fire while the fuzzy
+  finder has focus.
+- **MIDI-source commands** — a gesture on the instrument itself, for when even the computer
+  keyboard is too far. Recognised only while **no note key is held**, so a gesture can never be
+  mistaken for playing: e.g. sustain pedal tapped once → restart bar, twice → restart song, soft
+  pedal held + sustain tap → previous bar. (The exact vocabulary is to be chosen during the phase;
+  the examples are illustrative.) This lands as a pure `core/commands/gestureRecognizer.ts` — a
+  state machine over the existing timestamped MIDI input stream, driven in tests by
+  `FakeMidiInput` + `FakeClock`, table-driven over tap counts, timing windows, and the
+  near-misses that must *not* trigger.
+- Supersedes ideas 1 in [IDEAS.md](IDEAS.md).
+- **Done when:** you can find, start, loop and restart a piece without touching the mouse — and
+  restart the bar you just fluffed without lifting your hands off the keys at all.
+
+#### 6c — Guide output toggle
+- **One checkbox: "Send guide to MIDI out."** Off = practice (silent guide, you are the sound),
+  on = listen along. Today the only way to switch is to unselect and re-select the output device,
+  which is absurd for something you toggle every few minutes.
+- It gates the scheduler's sends, not the device connection: the port stays open and selected, and
+  flipping it mid-playback takes effect immediately and sends `all notes off` on the way down so
+  nothing hangs. Bound to a command in 6b, and persisted.
+- **Done when:** you can flip between practising and listening mid-piece, instantly, without
+  touching the device picker.
 
 ### Phase 7 — PDF path (option 1 from the brief)
 - Pair a `.pdf` with a `.mid`, render pages with pdf.js, play the MIDI as the guide.
@@ -263,12 +319,17 @@ Open question, needs a timeboxed investigation before any commitment:
 
 ## 8. Immediate next steps
 
-1. Set up the repo and CI (Phase 0).
-2. Two short spikes, throwaway code, timeboxed:
-   - **Spike A:** OSMD renders one of your real MuseScore exports, and we can move the cursor and
-     recolor a specific notehead.
-   - **Spike B:** Web MIDI reads your keyboard and we log timestamped note events.
-3. Record the outcomes as ADRs, then start Phase 1 test-first.
+Phases 0–5 are done: a MuseScore export parses, renders, plays out to your instrument, and judges
+what you play. What is missing is everything *around* the practice loop — getting to a piece, and
+controlling it without leaving the keyboard. That is Phase 6.
 
-Both spikes de-risk the two assumptions everything else rests on. Nothing after them is
-speculative.
+1. **6c first** — the guide-output checkbox. Smallest change, largest daily relief, and it
+   establishes the "command, not a device reconnection" shape that 6b builds on.
+2. **6b** — the `Command` layer, keyboard bindings, then the MIDI gesture recognizer test-first.
+3. **6a** — the library: persisted root handle and recursive index, then the pure fuzzy ranker and
+   recent/favourites/most-played ordering, then the sidebar UI on top of them.
+
+One thing to settle before 6a: whether the persisted directory handle survives a browser restart
+cleanly enough on Chromium to make "your library is just there" true, or whether the permission
+re-prompt makes it a one-click-per-session promise instead. Worth a ten-minute check, because the
+answer changes what the sidebar shows on a cold start.
